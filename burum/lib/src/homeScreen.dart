@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'mapScreen.dart';
+import 'mapScreen.dart'; // 같은 폴더에 mapScreen.dart가 있어야 해요!
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -16,9 +16,9 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _trendingTags = [];
   bool _isLoading = true;
 
-  // ⚠️ 본인 환경에 맞춰 주석 해제
+  // ⚠️ 중요: 환경에 맞춰 주석 해제 (지금은 크롬/웹 기준)
   final String baseUrl = "http://localhost:3000/api"; 
-  // final String baseUrl = "http://10.0.2.2:3000/api";
+  // final String baseUrl = "http://10.0.2.2:3000/api"; // 안드로이드 에뮬레이터용
 
   @override
   void initState() {
@@ -104,7 +104,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const SizedBox(height: 30),
             
-            // 인기 태그
+            // 인기 태그 섹션
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -127,7 +127,7 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
             const Divider(thickness: 8, color: Color(0xFFF5F5F5), height: 40),
 
-            // 게시글 리스트
+            // 게시글 리스트 섹션
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Column(
@@ -148,19 +148,33 @@ class _HomeScreenState extends State<HomeScreen> {
                                   deadlineInfo: _formatDate(post['deadline']),
                                   nickname: post['nickname'] ?? '익명',
                                   tags: _parseTags(post['tags']),
-                                  imageUrl: post['image_url'], // 👈 이미지 URL 전달
+                                  imageUrl: post['image_url'], // 이미지 URL 전달
                                 ),
                                 const Divider(color: Colors.grey, thickness: 0.5),
                               ],
                             );
                           }).toList(),
                         ),
+                  const SizedBox(height: 80), // 하단 버튼에 가려지지 않게 여백 추가
                 ],
               ),
             ),
           ],
         ),
       ),
+
+      // 👇 [복구 완료!] 지도로 보기 버튼
+      floatingActionButton: FloatingActionButton.extended(
+        onPressed: () {
+          Navigator.push(context, MaterialPageRoute(builder: (context) => const MapScreen()));
+        },
+        backgroundColor: const Color(0xFFFFF59D),
+        elevation: 4,
+        shape: const StadiumBorder(),
+        icon: const Icon(Icons.map_outlined, color: Colors.black),
+        label: const Text('지도로 보기', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+      ),
+      
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
         currentIndex: _selectedIndex,
@@ -177,6 +191,7 @@ class _HomeScreenState extends State<HomeScreen> {
     );
   }
 
+  // 태그 리스트 생성 함수
   List<Widget> _buildTagList(int start, int end) {
     List<Widget> list = [];
     for (int i = start; i < end; i++) {
@@ -190,7 +205,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return list;
   }
 
-  // 👇 여기가 핵심 수정 부분!
+  // 게시글 아이템 (이미지 포함 버전)
   Widget _buildErrandItem({
     required String title,
     required String desc,
@@ -198,45 +213,39 @@ class _HomeScreenState extends State<HomeScreen> {
     required String deadlineInfo,
     required String nickname,
     required List<String> tags,
-    String? imageUrl, // 이미지가 올 수도 있고 없을 수도 있음
+    String? imageUrl,
   }) {
     return Container(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // [이미지 영역]
+          // 이미지 박스
           Container(
-            width: 80, height: 80, // 크기 살짝 키움
+            width: 80, height: 80,
             decoration: BoxDecoration(
-              color: Colors.grey.shade200, // 배경색 (이미지 로딩 전이나 없을 때 보임)
+              color: Colors.grey.shade200,
               borderRadius: BorderRadius.circular(12),
               border: Border.all(color: Colors.grey.shade300),
             ),
-            clipBehavior: Clip.hardEdge, // 둥근 모서리에 이미지 맞춰 자르기
+            clipBehavior: Clip.hardEdge,
             child: (imageUrl != null && imageUrl.isNotEmpty)
                 ? Image.network(
                     imageUrl, 
-                    fit: BoxFit.cover, // 박스 꽉 채우기
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(Icons.broken_image, color: Colors.grey); // 에러나면 깨진 아이콘
-                    },
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
                   )
-                : const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 30), // 👈 이미지가 없으면 디폴트 아이콘 박스
+                : const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 30),
           ),
-          
           const SizedBox(width: 15),
-
-          // [내용 영역]
+          // 텍스트 내용
           Expanded(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Row(
                   children: [
-                    Flexible(
-                      child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis),
-                    ),
+                    Flexible(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
                     const SizedBox(width: 8),
                     ...tags.map((tag) => Padding(padding: const EdgeInsets.only(right: 4.0), child: Text(tag, style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.w600)))),
                   ],
