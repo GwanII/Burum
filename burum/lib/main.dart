@@ -1,20 +1,27 @@
+import 'package:burum/src/main_Screen.dart';
 import 'package:flutter/material.dart';
-import 'screens/chat_list_screen.dart';
-import 'theme.dart';
+import 'src/main_Screen.dart'; // 👈 방금 만든 파일을 여기서 불러옵니다!
 
 void main() {
-  runApp(const BurumApp());
+  runApp(const MyApp());
 }
 
-class BurumApp extends StatelessWidget {
-  const BurumApp({super.key});
+class MyApp extends StatelessWidget {
+  const MyApp({super.key});
 
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.themeData,
-      home: const ChatListScreen(),
+      title: 'Burum Demo',
+      theme: ThemeData(
+        // 앱 전체 테마 설정
+        primaryColor: const Color(0xFFFFF59D),
+        scaffoldBackgroundColor: Colors.white,
+        useMaterial3: true,
+      ),
+      // 홈 화면으로 아까 만든 HomeScreen을 보여줘라!
+      home: const MainScreen(), 
     );
   }
 }
