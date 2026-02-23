@@ -117,24 +117,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ),
       ),
 
-      // ✅ 하단바
-      bottomNavigationBar: BottomNavigationBar(
-        currentIndex: _currentIndex,
-        selectedItemColor: Colors.black,
-        unselectedItemColor: Colors.grey,
-        onTap: (index) {
-          setState(() {
-            _currentIndex = index;
-          });
-        },
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home), label: "홈"),
-          BottomNavigationBarItem(icon: Icon(Icons.chat), label: "채팅"),
-          BottomNavigationBarItem(icon: Icon(Icons.work), label: "심부름"),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today), label: "캘린더"),
-          BottomNavigationBarItem(icon: Icon(Icons.person), label: "마이"),
-        ],
-      ),
+      
     );
   }
 
