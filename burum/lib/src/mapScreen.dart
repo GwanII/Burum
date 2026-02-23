@@ -22,13 +22,13 @@ class MapScreen extends StatelessWidget {
       // 2. 지도 영역
       body: FlutterMap(
         options: const MapOptions(
-          initialCenter: LatLng(37.5665, 126.9780), // 서울 시청 중심
-          initialZoom: 14.0, // 적당한 확대 레벨
+        initialCenter: LatLng(35.1567, 128.1045), 
+          initialZoom: 17.0, // 건물 찾기 좋게 좀 더 확대
         ),
         children: [
           // (1) 지도 타일 (오픈스트리트맵 - 무료)
           TileLayer(
-            urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+            urlTemplate: 'https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}.png',
             userAgentPackageName: 'com.example.burum',
           ),
 
@@ -37,21 +37,21 @@ class MapScreen extends StatelessWidget {
             markers: [
               // 마커 1: 카레 심부름
               Marker(
-                point: const LatLng(37.5665, 126.9780), // 서울 시청
+                point: const LatLng(35.1568, 128.1045), 
                 width: 80,
                 height: 80,
-                child: const Icon(Icons.location_on, color: Colors.orange, size: 40),
+                child: const Icon(Icons.location_on, color: Colors.red, size: 40),
               ),
               // 마커 2: 수리검 심부름
               Marker(
-                point: const LatLng(37.5645, 126.9750), // 조금 옆
+                point: const LatLng(35.1567, 128.105), 
                 width: 80,
                 height: 80,
-                child: const Icon(Icons.location_on, color: Colors.blue, size: 40),
+                child: const Icon(Icons.location_on, color: Colors.red, size: 40),
               ),
               // 마커 3: 헬스 보조
               Marker(
-                point: const LatLng(37.5695, 126.9800), // 조금 위
+                point: const LatLng(35.159, 128.108), 
                 width: 80,
                 height: 80,
                 child: const Icon(Icons.location_on, color: Colors.red, size: 40),
