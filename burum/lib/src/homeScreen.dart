@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'mapScreen.dart'; // 같은 폴더에 mapScreen.dart가 있어야 해요!
+import 'myPageScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -67,7 +68,18 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   void _onItemTapped(int index) {
-    setState(() { _selectedIndex = index; });
+    if (index == 4) {
+      // 5번째 탭('마이')을 눌렀을 때: 마이페이지로 화면 이동! 🚀
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (context) => const MyPageScreen()),
+      );
+    } else {
+      // 다른 탭을 눌렀을 때는 기존처럼 상태(색상)만 변경
+      setState(() {
+        _selectedIndex = index;
+      });
+    }
   }
 
   @override
@@ -173,20 +185,6 @@ class _HomeScreenState extends State<HomeScreen> {
         shape: const StadiumBorder(),
         icon: const Icon(Icons.map_outlined, color: Colors.black),
         label: const Text('지도로 보기', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
-      ),
-      
-      bottomNavigationBar: BottomNavigationBar(
-        type: BottomNavigationBarType.fixed,
-        currentIndex: _selectedIndex,
-        onTap: _onItemTapped,
-        selectedItemColor: Colors.black,
-        items: const [
-          BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: '홈'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '채팅'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: '심부름'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: '캘린더'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: '마이'),
-        ],
       ),
     );
   }
