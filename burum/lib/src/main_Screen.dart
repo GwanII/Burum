@@ -3,7 +3,7 @@ import 'homeScreen.dart';
 import 'myPageScreen.dart';
 import '../screens/chat_list_screen.dart';
 
-
+// ㅁㄴㅇㄻㄴㅇㄻㄴㅇㄹㄴㅁㅇㅁㄹㄴㅇㄹ
 class MainScreen extends StatefulWidget {
   const MainScreen({Key? key}) : super(key: key);
 
@@ -19,7 +19,7 @@ class _MainScreenState extends State<MainScreen> {
   // (나중에 채팅, 심부름, 캘린더 화면을 만들면 여기에 쏙쏙 넣으시면 됩니다)
   final List<Widget> _screens = [
     const HomeScreen(),
-    const ChatListScreen(),
+    ChatListScreen(),
     const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
     const Center(child: Text('캘린더 화면 (준비중)')), // 3번 탭 (임시)
     const MyPageScreen(), // 4번 탭 (마이페이지)
