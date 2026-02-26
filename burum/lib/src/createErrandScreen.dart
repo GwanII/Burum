@@ -22,12 +22,12 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   final TextEditingController _locationController = TextEditingController(); // 스키마엔 없지만 UI용
 
   Future<void> _submitErrand() async {
-    final url = Uri.parse('http://localhost:3000/api');
+    final url = Uri.parse('http://localhost:3000/api/createErrand');
 
     final requestData = {
-      "user": 1, 
+      "user_id": 1,
       "title": _titleController.text,
-      "context": "${_contextController.text}\n(장소: ${_locationController.text})",
+      "content": "${_contextController.text}\n(장소: ${_locationController.text})",
       "cost": int.tryParse(_costController.text),
       "deadline": "2026-12-31 23:59:59",
       "tags": ["심부름", "테스트"],
