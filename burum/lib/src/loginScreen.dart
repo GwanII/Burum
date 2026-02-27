@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'main_Screen.dart';
 import 'signupScreen.dart';
 
@@ -14,6 +15,8 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+
+  final storage = const FlutterSecureStorage();
 
   final String baseUrl = "http://localhost:3000/api/users";
   // final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
@@ -41,8 +44,13 @@ class _LoginScreenState extends State<LoginScreen> {
 
       if (response.statusCode == 200) {
         final accessToken = responseData['accessToken'];
-        print('로그인 성공! Access Token: $accessToken');
+        final refreshToken = responseData['refreshToken'];
+
+        await storage.write(key: 'accessToken', value: accessToken);
+        await storage.write(key: 'refreshToken', value: refreshToken);
+
         _showMessage('BURUM에 오신 것을 환영합니다! ');
+
         Navigator.pushReplacement(
           context,
           MaterialPageRoute(builder: (context) => MainScreen()),
