@@ -23,7 +23,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Future<void> fetchChatRooms() async {
     final response = await http.get(
-      Uri.parse("http://localhost:3000/chat/rooms/1"),
+      Uri.parse("http://localhost:3000/api/chat/rooms/1"),
     );
 
     if (response.statusCode == 200) {
@@ -39,7 +39,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
 
   Future<void> deleteRoom(int roomId) async {
     await http.delete(
-      Uri.parse("http://localhost:3000/chat/rooms/$roomId"),
+      Uri.parse("http://localhost:3000/api/chat/rooms/$roomId"),
     );
 
     fetchChatRooms();

@@ -29,7 +29,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> fetchMessages() async {
     final response = await http.get(
       Uri.parse(
-          "http://localhost:3000/chat/messages/${widget.room.roomId}"),
+          "http://localhost:3000/api/chat/messages/${widget.room.roomId}"),
     );
 
     if (response.statusCode == 200) {
@@ -46,7 +46,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     if (controller.text.trim().isEmpty) return;
 
     await http.post(
-      Uri.parse("http://localhost:3000/chat/message"),
+      Uri.parse("http://localhost:3000/api/chat/message"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "chatRoomId": widget.room.roomId,
@@ -61,7 +61,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   Future<void> markAsRead() async {
     await http.post(
-      Uri.parse("http://localhost:3000/chat/read"),
+      Uri.parse("http://localhost:3000/api/chat/read"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "roomId": widget.room.roomId,
