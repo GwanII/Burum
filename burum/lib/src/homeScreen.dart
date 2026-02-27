@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'mapScreen.dart'; // 같은 폴더에 mapScreen.dart가 있어야 해요!
 import 'myPageScreen.dart';
+import 'postDetailScreen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -175,7 +176,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
 
-      // 👇 [복구 완료!] 지도로 보기 버튼
+      // 지도로 보기 버튼
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(context, MaterialPageRoute(builder: (context) => const MapScreen()));
@@ -203,7 +204,7 @@ class _HomeScreenState extends State<HomeScreen> {
     return list;
   }
 
-  // 게시글 아이템 (이미지 포함 버전)
+  // 게시글 아이템 (👇 여기에 InkWell과 네비게이터를 추가했습니다!)
   Widget _buildErrandItem({
     required String title,
     required String desc,
@@ -213,55 +214,74 @@ class _HomeScreenState extends State<HomeScreen> {
     required List<String> tags,
     String? imageUrl,
   }) {
-    return Container(
-      padding: const EdgeInsets.symmetric(vertical: 10),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          // 이미지 박스
-          Container(
-            width: 80, height: 80,
-            decoration: BoxDecoration(
-              color: Colors.grey.shade200,
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            clipBehavior: Clip.hardEdge,
-            child: (imageUrl != null && imageUrl.isNotEmpty)
-                ? Image.network(
-                    imageUrl, 
-                    fit: BoxFit.cover,
-                    errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
-                  )
-                : const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 30),
-          ),
-          const SizedBox(width: 15),
-          // 텍스트 내용
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Row(
-                  children: [
-                    Flexible(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
-                    const SizedBox(width: 8),
-                    ...tags.map((tag) => Padding(padding: const EdgeInsets.only(right: 4.0), child: Text(tag, style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.w600)))),
-                  ],
-                ),
-                const SizedBox(height: 4),
-                Text(desc, style: const TextStyle(color: Colors.grey, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
-                const SizedBox(height: 8),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  children: [
-                    Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                    Text('$deadlineInfo | $nickname', style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w500)),
-                  ],
-                ),
-              ],
+    return InkWell(
+      onTap: () {
+        // 아이템 클릭 시 상세 페이지로 이동 🚀
+        Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (context) => PostDetailScreen(
+              title: title,
+              content: desc,
+              price: price,
+              date: deadlineInfo,
+              nickname: nickname,
+              tags: tags,
+              imageUrl: imageUrl,
             ),
           ),
-        ],
+        );
+      },
+      child: Container(
+        padding: const EdgeInsets.symmetric(vertical: 10),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            // 이미지 박스
+            Container(
+              width: 80, height: 80,
+              decoration: BoxDecoration(
+                color: Colors.grey.shade200,
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: Colors.grey.shade300),
+              ),
+              clipBehavior: Clip.hardEdge,
+              child: (imageUrl != null && imageUrl.isNotEmpty)
+                  ? Image.network(
+                      imageUrl, 
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, color: Colors.grey),
+                    )
+                  : const Icon(Icons.image_not_supported_outlined, color: Colors.grey, size: 30),
+            ),
+            const SizedBox(width: 15),
+            // 텍스트 내용
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Flexible(child: Text(title, style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold), maxLines: 1, overflow: TextOverflow.ellipsis)),
+                      const SizedBox(width: 8),
+                      ...tags.map((tag) => Padding(padding: const EdgeInsets.only(right: 4.0), child: Text(tag, style: const TextStyle(fontSize: 12, color: Colors.blueAccent, fontWeight: FontWeight.w600)))),
+                    ],
+                  ),
+                  const SizedBox(height: 4),
+                  Text(desc, style: const TextStyle(color: Colors.grey, fontSize: 13), maxLines: 2, overflow: TextOverflow.ellipsis),
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text(price, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+                      Text('$deadlineInfo | $nickname', style: const TextStyle(color: Colors.redAccent, fontSize: 12, fontWeight: FontWeight.w500)),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
       ),
     );
   }
