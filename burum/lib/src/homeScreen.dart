@@ -179,7 +179,7 @@ class _HomeScreenState extends State<HomeScreen> {
       // 지도로 보기 버튼
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
-          Navigator.push(context, MaterialPageRoute(builder: (context) => const MapScreen()));
+          Navigator.push(context, MaterialPageRoute(builder: (context) => MapScreen()));
         },
         backgroundColor: const Color(0xFFFFF59D),
         elevation: 4,
