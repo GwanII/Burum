@@ -23,7 +23,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // 홈 화면으로 아까 만든 HomeScreen을 보여줘라!
-      home: const CreateErrandsPage(),
+      home: const LoginScreen(),
     );
   }
 }
