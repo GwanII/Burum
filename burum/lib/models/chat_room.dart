@@ -1,17 +1,29 @@
 class ChatRoom {
-  final String id;
+  final int roomId;
   final String nickname;
-  final String profileImage;
-  final String lastMessage;
-  int unreadCount;
+  final String? lastMessage;
+  final DateTime? lastMessageTime;
+  final int unreadCount;
   bool isPinned;
 
   ChatRoom({
-    required this.id,
+    required this.roomId,
     required this.nickname,
-    required this.profileImage,
-    required this.lastMessage,
+    this.lastMessage,
+    this.lastMessageTime,
     required this.unreadCount,
     this.isPinned = false,
   });
+
+  factory ChatRoom.fromJson(Map<String, dynamic> json) {
+    return ChatRoom(
+      roomId: json['roomId'],
+      nickname: "상대방", // 일단 더미
+      lastMessage: json['lastMessage'],
+      lastMessageTime: json['lastMessageTime'] != null
+          ? DateTime.parse(json['lastMessageTime'])
+          : null,
+      unreadCount: json['unreadCount'] ?? 0,
+    );
+  }
 }

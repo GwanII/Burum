@@ -1,168 +1,77 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+
 import '../models/chat_room.dart';
 import '../widgets/chat_tile.dart';
 import 'chat_room_screen.dart';
 
 class ChatListScreen extends StatefulWidget {
-  const ChatListScreen({super.key});
-
   @override
-  State<ChatListScreen> createState() => _ChatListScreenState();
+  _ChatListScreenState createState() => _ChatListScreenState();
 }
 
 class _ChatListScreenState extends State<ChatListScreen> {
-  int _currentIndex = 1;
-  bool showUnreadOnly = false;
+  List<ChatRoom> chatRooms = [];
+  bool isLoading = true;
 
-  List<ChatRoom> chatRooms = [
-    ChatRoom(
-      id: "1",
-      nickname: "홍길동",
-      profileImage: "",
-      lastMessage: "안녕하세요!",
-      unreadCount: 2,
-    ),
-    ChatRoom(
-      id: "2",
-      nickname: "김철수",
-      profileImage: "",
-      lastMessage: "거래 가능할까요?",
-      unreadCount: 0,
-    ),
-  ];
+  @override
+  void initState() {
+    super.initState();
+    fetchChatRooms();
+  }
+
+  Future<void> fetchChatRooms() async {
+    final response = await http.get(
+      Uri.parse("http://localhost:3000/api/chat/rooms/1"),
+    );
+
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
+
+      setState(() {
+        chatRooms =
+            data.map((json) => ChatRoom.fromJson(json)).toList();
+        isLoading = false;
+      });
+    }
+  }
+
+  Future<void> deleteRoom(int roomId) async {
+    await http.delete(
+      Uri.parse("http://localhost:3000/api/chat/rooms/$roomId"),
+    );
+
+    fetchChatRooms();
+  }
 
   @override
   Widget build(BuildContext context) {
-    List<ChatRoom> filtered = showUnreadOnly
-        ? chatRooms.where((c) => c.unreadCount > 0).toList()
-        : chatRooms;
-
     return Scaffold(
-      appBar: AppBar(
-        title: const Text("채팅"),
-      ),
+      appBar: AppBar(title: Text("채팅")),
+      body: isLoading
+          ? Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              itemCount: chatRooms.length,
+              itemBuilder: (context, index) {
+                final room = chatRooms[index];
 
-      // ✅ 중앙 흰색
-      body: Container(
-        color: Colors.white,
-        child: Column(
-          children: [
-            const SizedBox(height: 12),
+                return ChatTile(
+                  room: room,
+                  onTap: () async {
+                    await Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (_) => ChatRoomScreen(room: room),
+                      ),
+                    );
 
-            // ✅ 안 읽음 버튼 스타일
-            Align(
-              alignment: Alignment.centerLeft,
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: GestureDetector(
-                  onTap: () {
-                    setState(() {
-                      showUnreadOnly = !showUnreadOnly;
-                    });
+                    fetchChatRooms();
                   },
-                  child: Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                    decoration: BoxDecoration(
-                      color: showUnreadOnly
-                          ? Colors.amber[200]
-                          : Colors.grey[200],
-                      borderRadius: BorderRadius.circular(20),
-                    ),
-                    child: const Text("안 읽음"),
-                  ),
-                ),
-              ),
+                  onLongPress: () => deleteRoom(room.roomId),
+                );
+              },
             ),
-
-            const SizedBox(height: 12),
-
-            Expanded(
-              child: ListView.builder(
-                itemCount: filtered.length,
-                itemBuilder: (context, index) {
-                  final room = filtered[index];
-
-                  return Dismissible(
-                    key: Key(room.id),
-                    background: slideLeftBackground(),
-                    direction: DismissDirection.endToStart,
-                    confirmDismiss: (_) async {
-                      showModalBottomSheet(
-                        context: context,
-                        builder: (_) => buildOptionSheet(room),
-                      );
-                      return false;
-                    },
-                    child: ChatTile(
-                      room: room,
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) =>
-                                ChatRoomScreen(room: room),
-                          ),
-                        );
-                      },
-                      onUpdate: () {
-                        setState(() {});
-                      },
-                    ),
-                  );
-                },
-              ),
-            ),
-          ],
-        ),
-      ),
-
-      
-    );
-  }
-
-  Widget slideLeftBackground() {
-    return Container(
-      color: Colors.grey[300],
-      alignment: Alignment.centerRight,
-      padding: const EdgeInsets.only(right: 20),
-      child: const Icon(Icons.more_horiz),
-    );
-  }
-
-  Widget buildOptionSheet(ChatRoom room) {
-    return SafeArea(
-      child: Wrap(
-        children: [
-          ListTile(
-            title: const Text("상단 고정"),
-            onTap: () {
-              setState(() {
-                room.isPinned = !room.isPinned;
-              });
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: const Text("읽기 처리"),
-            onTap: () {
-              setState(() {
-                room.unreadCount = 0;
-              });
-              Navigator.pop(context);
-            },
-          ),
-          ListTile(
-            title: const Text("채팅방 나가기"),
-            onTap: () {
-              setState(() {
-                chatRooms.remove(room);
-              });
-              Navigator.pop(context);
-            },
-          ),
-        ],
-      ),
     );
   }
 }

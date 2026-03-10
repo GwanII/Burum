@@ -4,57 +4,47 @@ import '../models/chat_room.dart';
 class ChatTile extends StatelessWidget {
   final ChatRoom room;
   final VoidCallback onTap;
-  final VoidCallback onUpdate;
+  final VoidCallback onLongPress;
 
   const ChatTile({
-    super.key,
     required this.room,
     required this.onTap,
-    required this.onUpdate,
+    required this.onLongPress,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListTile(
-      onTap: onTap,
-
-      leading: const CircleAvatar(
-        backgroundColor: Colors.grey,
-        child: Icon(Icons.person),
-      ),
-
-      title: Row(
+      title: Text(room.nickname),
+      subtitle: Text(room.lastMessage ?? ""),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
         children: [
-          Expanded(
-            child: Text(
-              room.nickname,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+          if (room.lastMessageTime != null)
+            Text(
+              "${room.lastMessageTime!.hour}:${room.lastMessageTime!.minute.toString().padLeft(2, '0')}",
+              style: TextStyle(fontSize: 12),
             ),
-          ),
-
-          //  상단 고정 핀 아이콘
-          if (room.isPinned)
-            const Icon(
-              Icons.push_pin,
-              size: 18,
-              color: Colors.grey,
-            ),
-        ],
-      ),
-
-      subtitle: Text(room.lastMessage),
-
-      trailing: room.unreadCount > 0
-          ? CircleAvatar(
-              radius: 12,
-              backgroundColor: Colors.red,
+          if (room.unreadCount > 0)
+            Container(
+              margin: EdgeInsets.only(top: 4),
+              padding: EdgeInsets.all(6),
+              decoration: BoxDecoration(
+                color: Colors.red,
+                shape: BoxShape.circle,
+              ),
               child: Text(
                 room.unreadCount.toString(),
-                style:
-                    const TextStyle(color: Colors.white, fontSize: 12),
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 12,
+                ),
               ),
             )
-          : null,
+        ],
+      ),
+      onTap: onTap,
+      onLongPress: onLongPress,
     );
   }
 }
