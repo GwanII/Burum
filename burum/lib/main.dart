@@ -1,3 +1,5 @@
+import 'package:burum/screens/chat_list_screen.dart';
+import 'package:burum/src/homeScreen.dart';
 import 'package:burum/src/loginScreen.dart';
 import 'package:burum/src/main_Screen.dart';
 import 'package:flutter/material.dart';
@@ -23,7 +25,7 @@ class MyApp extends StatelessWidget {
         useMaterial3: true,
       ),
       // 홈 화면으로 아까 만든 HomeScreen을 보여줘라!
-      home: const CreateErrandsPage(),
+      home: const ChatListScreen(),
     );
   }
 }
