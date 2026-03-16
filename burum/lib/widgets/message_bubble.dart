@@ -6,14 +6,18 @@ class MessageBubble extends StatelessWidget {
   final Message message;
   final bool isMe;
   final String otherUserNickname;
+  final String? otherUserProfileImage;
   final String formattedTime;
+  final VoidCallback? onOtherUserTap;
 
   const MessageBubble({
     super.key,
     required this.message,
     required this.isMe,
     required this.otherUserNickname,
+    required this.otherUserProfileImage,
     required this.formattedTime,
+    this.onOtherUserTap,
   });
 
   void _openFullScreenImage(BuildContext context, String imageUrl) {
@@ -51,6 +55,27 @@ class MessageBubble extends StatelessWidget {
     );
   }
 
+  Widget _buildOtherAvatar() {
+    if (otherUserProfileImage != null && otherUserProfileImage!.isNotEmpty) {
+      return CircleAvatar(
+        radius: 16,
+        backgroundImage: NetworkImage("$kBaseUrl$otherUserProfileImage"),
+      );
+    }
+
+    return CircleAvatar(
+      radius: 16,
+      backgroundColor: Colors.amber[100],
+      child: Text(
+        otherUserNickname.isNotEmpty ? otherUserNickname[0] : '?',
+        style: const TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.bold,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final bubble = Container(
@@ -61,8 +86,22 @@ class MessageBubble extends StatelessWidget {
       decoration: BoxDecoration(
         color: message.type == "image"
             ? Colors.transparent
-            : (isMe ? Colors.amber[200] : Colors.white),
+            : (isMe ? Colors.amber[200] : const Color(0xFFFFFFFF)),
         borderRadius: BorderRadius.circular(14),
+        border: isMe
+            ? null
+            : Border.all(
+                color: const Color(0xFFE9E9E9),
+              ),
+        boxShadow: message.type == "image"
+            ? null
+            : [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.03),
+                  blurRadius: 4,
+                  offset: const Offset(0, 1),
+                ),
+              ],
       ),
       child: message.type == "image"
           ? _buildImage(context)
@@ -110,30 +149,29 @@ class MessageBubble extends StatelessWidget {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          CircleAvatar(
-            radius: 16,
-            backgroundColor: Colors.amber[100],
-            child: Text(
-              otherUserNickname.isNotEmpty ? otherUserNickname[0] : '?',
-              style: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
+          GestureDetector(
+            onTap: onOtherUserTap,
+            child: _buildOtherAvatar(),
           ),
           const SizedBox(width: 8),
           Flexible(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                Text(
-                  otherUserNickname,
-                  style: const TextStyle(
-                    fontSize: 12,
-                    color: Colors.black54,
+                GestureDetector(
+                  onTap: onOtherUserTap,
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 4),
+                    child: Text(
+                      otherUserNickname,
+                      style: const TextStyle(
+                        fontSize: 12,
+                        color: Colors.black54,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
                   ),
                 ),
-                const SizedBox(height: 4),
                 Row(
                   crossAxisAlignment: CrossAxisAlignment.end,
                   children: [

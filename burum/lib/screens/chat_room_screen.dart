@@ -9,6 +9,8 @@ import '../chat_config.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
 import '../widgets/message_bubble.dart';
+import 'profile_detail_screen.dart';
+import '../src/postDetailScreen.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom room;
@@ -34,21 +36,40 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     markAsRead();
   }
 
+  void openProfileDetail() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => ProfileDetailScreen(
+          userId: widget.room.otherUserId,
+        ),
+      ),
+    );
+  }
+
+  bool get hasPostPreview {
+    return (widget.room.postId != null) ||
+        (widget.room.postTitle != null && widget.room.postTitle!.trim().isNotEmpty) ||
+        (widget.room.postImage != null && widget.room.postImage!.trim().isNotEmpty) ||
+        (widget.room.postContent != null && widget.room.postContent!.trim().isNotEmpty) ||
+        (widget.room.postCost != null);
+  }
+
   Future<void> _scrollToBottom({bool animated = true}) async {
     await Future.delayed(const Duration(milliseconds: 50));
 
     if (!scrollController.hasClients) return;
 
-    final position = scrollController.position.maxScrollExtent;
+    final maxScroll = scrollController.position.maxScrollExtent;
 
     if (animated) {
       await scrollController.animateTo(
-        position,
+        maxScroll,
         duration: const Duration(milliseconds: 280),
         curve: Curves.easeOut,
       );
     } else {
-      scrollController.jumpTo(position);
+      scrollController.jumpTo(maxScroll);
     }
   }
 
@@ -118,9 +139,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final Uint8List? bytes = pickedFile.bytes;
 
       if (bytes == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미지 데이터를 불러오지 못했습니다.')),
-        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('이미지 데이터를 불러오지 못했습니다.')),
+          );
+        }
         return;
       }
 
@@ -128,8 +151,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         isUploadingImage = true;
       });
 
-      final uri = Uri.parse("$kBaseUrl/api/chat/image");
-      final request = http.MultipartRequest('POST', uri)
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse("$kBaseUrl/api/chat/image"),
+      )
         ..fields['chatRoomId'] = widget.room.roomId.toString()
         ..fields['senderId'] = kCurrentUserId.toString()
         ..files.add(
@@ -234,16 +259,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Widget buildPostCard() {
-    if (widget.room.postTitle == null && widget.room.postImage == null) {
-      return const SizedBox.shrink();
-    }
+    if (!hasPostPreview) return const SizedBox.shrink();
 
     return GestureDetector(
       onTap: () {
         Navigator.push(
           context,
           MaterialPageRoute(
-            builder: (_) => DummyPostDetailScreen(room: widget.room),
+            builder: (_) => PostDetailScreen(
+              title: widget.room.postTitle ?? '게시물 정보 없음',
+              content: widget.room.postContent ?? '내용 없음',
+              price: '${widget.room.postCost ?? 0}',
+              date: widget.room.postDeadline ?? '',
+              nickname: widget.room.otherUserNickname,
+              tags: const [],
+              imageUrl: widget.room.postImage,
+            ),
           ),
         );
       },
@@ -307,6 +338,16 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                       fontSize: 15,
                       fontWeight: FontWeight.w700,
                     ),
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    "비용: ${widget.room.postCost ?? 0}원",
+                    style: const TextStyle(
+                      fontSize: 13,
+                      color: Colors.black54,
+                    ),
                   ),
                 ],
               ),
@@ -315,6 +356,32 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           ],
         ),
       ),
+    );
+  }
+
+  Widget buildProfileAvatar() {
+    final imageUrl = widget.room.otherUserProfileImage;
+
+    return GestureDetector(
+      onTap: openProfileDetail,
+      child: imageUrl != null && imageUrl.isNotEmpty
+          ? CircleAvatar(
+              radius: 18,
+              backgroundImage: NetworkImage("$kBaseUrl$imageUrl"),
+            )
+          : CircleAvatar(
+              radius: 18,
+              backgroundColor: Colors.amber[100],
+              child: Text(
+                widget.room.otherUserNickname.isNotEmpty
+                    ? widget.room.otherUserNickname[0]
+                    : '?',
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
+              ),
+            ),
     );
   }
 
@@ -328,22 +395,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         backgroundColor: const Color(0xFFFFF78D),
         surfaceTintColor: const Color(0xFFFFF78D),
         centerTitle: true,
-        title: GestureDetector(
-          onTap: () {
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => DummyProfileDetailScreen(room: widget.room),
+        title: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            buildProfileAvatar(),
+            const SizedBox(width: 10),
+            GestureDetector(
+              onTap: openProfileDetail,
+              child: Text(
+                widget.room.otherUserNickname,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
-            );
-          },
-          child: Text(
-            widget.room.otherUserNickname,
-            style: const TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.black87,
             ),
-          ),
+          ],
         ),
       ),
       body: Column(
@@ -369,7 +436,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             message: message,
                             isMe: message.senderId == kCurrentUserId,
                             otherUserNickname: widget.room.otherUserNickname,
+                            otherUserProfileImage:
+                                widget.room.otherUserProfileImage,
                             formattedTime: formatTime(message.time),
+                            onOtherUserTap: openProfileDetail,
                           ),
                         ],
                       );
@@ -447,139 +517,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ),
           ),
         ],
-      ),
-    );
-  }
-}
-
-class DummyProfileDetailScreen extends StatelessWidget {
-  final ChatRoom room;
-
-  const DummyProfileDetailScreen({super.key, required this.room});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('프로필'),
-        backgroundColor: const Color(0xFFFFF78D),
-        surfaceTintColor: const Color(0xFFFFF78D),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(24),
-        child: Column(
-          children: [
-            CircleAvatar(
-              radius: 42,
-              backgroundColor: Colors.amber[100],
-              child: Text(
-                room.otherUserNickname.isNotEmpty
-                    ? room.otherUserNickname[0]
-                    : '?',
-                style: const TextStyle(
-                  fontSize: 28,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-            ),
-            const SizedBox(height: 16),
-            Text(
-              room.otherUserNickname,
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Text(
-                '임시 프로필 상세 화면입니다.\n백엔드가 연결되면 사용자 소개, 평점, 거래 이력 등을 표시할 수 있습니다.',
-                style: TextStyle(fontSize: 14),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-class DummyPostDetailScreen extends StatelessWidget {
-  final ChatRoom room;
-
-  const DummyPostDetailScreen({super.key, required this.room});
-
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('게시물 상세'),
-        backgroundColor: const Color(0xFFFFF78D),
-        surfaceTintColor: const Color(0xFFFFF78D),
-      ),
-      body: Padding(
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (room.postImage != null && room.postImage!.isNotEmpty)
-              ClipRRect(
-                borderRadius: BorderRadius.circular(16),
-                child: Image.network(
-                  "$kBaseUrl${room.postImage}",
-                  width: double.infinity,
-                  height: 220,
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => Container(
-                    height: 220,
-                    color: Colors.grey[200],
-                    child: const Center(
-                      child: Icon(Icons.image_not_supported_outlined),
-                    ),
-                  ),
-                ),
-              )
-            else
-              Container(
-                width: double.infinity,
-                height: 220,
-                decoration: BoxDecoration(
-                  color: Colors.grey[200],
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: const Center(
-                  child: Icon(Icons.inventory_2_outlined, size: 40),
-                ),
-              ),
-            const SizedBox(height: 18),
-            Text(
-              room.postTitle ?? '게시물 제목 없음',
-              style: const TextStyle(
-                fontSize: 22,
-                fontWeight: FontWeight.bold,
-              ),
-            ),
-            const SizedBox(height: 16),
-            Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.grey[100],
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: const Text(
-                '임시 게시물 상세 화면입니다.\n백엔드가 연결되면 심부름 내용, 가격, 위치, 작성자 정보 등을 표시할 수 있습니다.',
-                style: TextStyle(fontSize: 14),
-              ),
-            ),
-          ],
-        ),
       ),
     );
   }

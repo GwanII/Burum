@@ -2,6 +2,7 @@ class Message {
   final int id;
   final int senderId;
   final String? senderNickname;
+  final String? senderProfileImage;
   final String? content;
   final String type;
   final String? imageUrl;
@@ -12,6 +13,7 @@ class Message {
     required this.id,
     required this.senderId,
     this.senderNickname,
+    this.senderProfileImage,
     this.content,
     required this.type,
     this.imageUrl,
@@ -24,6 +26,7 @@ class Message {
       id: json['id'],
       senderId: json['sender_id'],
       senderNickname: json['nickname'],
+      senderProfileImage: json['profile_image_url'],
       content: json['content'],
       type: json['type'] ?? 'text',
       imageUrl: json['image_url'],
