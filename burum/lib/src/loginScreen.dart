@@ -1,4 +1,5 @@
 import 'package:burum/src/locationScreen.dart';
+import 'package:burum/theme.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -7,6 +8,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
 import 'main_Screen.dart';
 import 'signupScreen.dart';
+import 'findPasswordScreen.dart'; // 새로 만든 파일 임포트
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +20,7 @@ class LoginScreen extends StatefulWidget {
 class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
+  bool _isPasswordObscured = true;
 
   final storage = const FlutterSecureStorage();
 
@@ -34,6 +37,10 @@ class _LoginScreenState extends State<LoginScreen> {
       return;
     }
 
+    setState(() {
+      _loadingType = 'normal';
+    });
+
     final url = Uri.parse('$baseUrl/login');
 
     try {
@@ -46,33 +53,19 @@ class _LoginScreenState extends State<LoginScreen> {
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        final accessToken = responseData['accessToken'];
-        final refreshToken = responseData['refreshToken'];
-
-        await storage.write(key: 'accessToken', value: accessToken);
-        await storage.write(key: 'refreshToken', value: refreshToken);
-
-        final bool requiresLocation = responseData['requiresLocation'] ?? false;
-
-        if (requiresLocation) {
-          _showMessage('동네 설정이 필요합니다.');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LocationScreen()),
-          );
-        } else {
-          _showMessage('BURUM에 오신 것을 환영합니다! ');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => MainScreen()),
-          );
-        }
+        await _handleLoginSuccess(responseData);
       } else {
         _showMessage(responseData['message'] ?? '로그인에 실패했습니다.');
       }
     } catch (error) {
       print('서버 통신 에러: $error');
       _showMessage('서버와 연결할 수 없습니다. 네트워크를 확인해주세요.');
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingType = '';
+        });
+      }
     }
   }
 
@@ -100,6 +93,10 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 소셜 로그인 API 호출 로직
   Future<void> _socialLogin(String provider) async {
+    setState(() {
+      _loadingType = provider;
+    });
+
     if (provider == 'Google') {
       // 초기화가 안 끝났는데 버튼을 눌렀다면, 끝날 때까지 기다림
       if (!_isGoogleInit) {
@@ -135,9 +132,18 @@ class _LoginScreenState extends State<LoginScreen> {
         } else {
           _showMessage('구글 로그인 중 오류가 발생했습니다.');
         }
+      } finally {
+        if (mounted) {
+          setState(() {
+            _loadingType = '';
+          });
+        }
       }
     } else {
       _showMessage('$provider 작업 중!');
+      setState(() {
+        _loadingType = '';
+      });
     }
   }
 
@@ -182,8 +188,41 @@ class _LoginScreenState extends State<LoginScreen> {
         _showMessage(responseData['message'] ?? '구글 로그인 처리에 실패했습니다.');
       }
     } catch (err) {
-      print('백엔드 통신 에러: $errorPropertyTextConfiguration');
+      print('백엔드 통신 에러: $err');
       _showMessage('서버와 연결할 수 없습니다. 백엔드가 켜져있는지 확인해주세요.');
+    }
+  }
+
+  // 로그인 성공 후 공통 처리 로직 (토큰 저장 및 화면 이동)
+  Future<void> _handleLoginSuccess(Map<String, dynamic> responseData) async {
+    final accessToken = responseData['accessToken'];
+    final refreshToken = responseData['refreshToken'];
+
+    // 토큰이 없는 경우 예외 처리
+    if (accessToken == null || refreshToken == null) {
+      _showMessage('로그인에 실패했습니다. (토큰 오류)');
+      return;
+    }
+
+    await storage.write(key: 'accessToken', value: accessToken);
+    await storage.write(key: 'refreshToken', value: refreshToken);
+
+    if (!mounted) return;
+
+    final bool requiresLocation = responseData['requiresLocation'] ?? false;
+
+    if (requiresLocation) {
+      _showMessage('동네 설정이 필요합니다.');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LocationScreen()),
+      );
+    } else {
+      _showMessage('BURUM에 오신 것을 환영합니다!');
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => MainScreen()),
+      );
     }
   }
 
@@ -225,21 +264,66 @@ class _LoginScreenState extends State<LoginScreen> {
 
               _buildTextField('아이디 또는 이메일', _emailController, false),
               SizedBox(height: 12),
-              _buildTextField('비밀번호', _passwordController, true),
-              SizedBox(height: 20),
+              _buildTextField(
+                '비밀번호',
+                _passwordController,
+                _isPasswordObscured,
+                suffixIcon: IconButton(
+                  icon: Icon(
+                    _isPasswordObscured
+                        ? Icons.visibility_off
+                        : Icons.visibility,
+                    color: Colors.grey,
+                  ),
+                  onPressed: () {
+                    setState(() {
+                      _isPasswordObscured = !_isPasswordObscured;
+                    });
+                  },
+                ),
+              ),
 
-              _buildRectButton('로그인', _login, Color(0xFFE8E8E8), Colors.black),
+              // 🌟 비밀번호 찾기 텍스트 버튼 추가
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const FindPasswordScreen(),
+                      ),
+                    );
+                  },
+                  child: Text(
+                    '비밀번호를 잊으셨나요?',
+                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                  ),
+                ),
+              ),
+
+              _buildRectButton(
+                '로그인',
+                _loadingType.isNotEmpty ? null : _login,
+                Color(0xFFE8E8E8),
+                Colors.black,
+                isLoading: _loadingType == 'normal',
+              ),
               SizedBox(height: 12),
 
               // 🌟 회원가입 화면으로 이동하는 버튼
               _buildRectButton(
                 '회원가입',
-                () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(builder: (context) => SignupScreen()),
-                  );
-                },
+                _loadingType.isNotEmpty
+                    ? null
+                    : () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => SignupScreen(),
+                          ),
+                        );
+                      },
                 Color(0xFFF5F5F5),
                 Colors.black54,
               ),
@@ -268,21 +352,24 @@ class _LoginScreenState extends State<LoginScreen> {
                 '구글로 계속하기',
                 Color(0xFFF2F2F2),
                 Colors.black87,
-                () => _socialLogin('Google'),
+                _loadingType.isNotEmpty ? null : () => _socialLogin('Google'),
+                isLoading: _loadingType == 'Google',
               ),
               SizedBox(height: 12),
               _buildRoundedButton(
                 '카카오로 계속하기',
                 Color(0xFFFEE500),
                 Colors.black87,
-                () => _socialLogin('Kakao'),
+                _loadingType.isNotEmpty ? null : () => _socialLogin('Kakao'),
+                isLoading: _loadingType == 'Kakao',
               ),
               SizedBox(height: 12),
               _buildRoundedButton(
                 '네이버로 계속하기',
                 Color(0xFF03C75A),
                 Colors.white,
-                () => _socialLogin('Naver'),
+                _loadingType.isNotEmpty ? null : () => _socialLogin('Naver'),
+                isLoading: _loadingType == 'Naver',
               ),
               SizedBox(height: 50),
             ],
@@ -295,19 +382,25 @@ class _LoginScreenState extends State<LoginScreen> {
   Widget _buildTextField(
     String hint,
     TextEditingController controller,
-    bool isPassword,
-  ) {
+    bool obscureText, {
+    Widget? suffixIcon,
+  }) {
     return TextField(
       controller: controller,
-      obscureText: isPassword,
+      obscureText: obscureText,
       decoration: InputDecoration(
         hintText: hint,
+        suffixIcon: suffixIcon,
         hintStyle: TextStyle(color: Colors.grey[500]),
         filled: true,
         fillColor: Color(0xFFF8F8F8),
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
           borderSide: BorderSide.none,
+        ),
+        focusedBorder: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(8.0),
+          borderSide: BorderSide(color: Color(0xFFFF7E36), width: 1.5),
         ),
         contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       ),
@@ -316,10 +409,11 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Widget _buildRectButton(
     String text,
-    VoidCallback onPressed,
+    VoidCallback? onPressed,
     Color bgColor,
-    Color textColor,
-  ) {
+    Color textColor, {
+    bool isLoading = false,
+  }) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
@@ -329,10 +423,20 @@ class _LoginScreenState extends State<LoginScreen> {
         padding: EdgeInsets.symmetric(vertical: 16),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(8.0)),
       ),
-      child: Text(
-        text,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
-      ),
+      child: isLoading
+          ? SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                // 빙글빙글 도는 애니메이션 (로딩)
+                color: textColor,
+                strokeWidth: 2.0,
+              ),
+            )
+          : Text(
+              text,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
     );
   }
 
@@ -340,8 +444,9 @@ class _LoginScreenState extends State<LoginScreen> {
     String text,
     Color bgColor,
     Color textColor,
-    VoidCallback onPressed,
-  ) {
+    VoidCallback? onPressed, {
+    bool isLoading = false,
+  }) {
     return ElevatedButton(
       onPressed: onPressed,
       style: ElevatedButton.styleFrom(
@@ -353,10 +458,19 @@ class _LoginScreenState extends State<LoginScreen> {
           borderRadius: BorderRadius.circular(12.0),
         ),
       ),
-      child: Text(
-        text,
-        style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
-      ),
+      child: isLoading
+          ? SizedBox(
+              height: 20,
+              width: 20,
+              child: CircularProgressIndicator(
+                color: textColor,
+                strokeWidth: 2.0,
+              ),
+            )
+          : Text(
+              text,
+              style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15),
+            ),
     );
   }
 }
