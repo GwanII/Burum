@@ -212,10 +212,10 @@ class _LocationScreenState extends State<LocationScreen> {
 
           // 2. 화면 정중앙 고정 마커 (유저가 지도를 움직일 때 기준점)
           Center(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                bottom: 35.0,
-              ), // 마커의 뾰족한 끝이 정중앙에 오도록 보정
+            child: AnimatedPadding(
+              duration: const Duration(milliseconds: 200),
+              curve: Curves.easeOut,
+              padding: EdgeInsets.only(bottom: _isMapMoving ? 50.0 : 35.0),
               child: Icon(
                 Icons.location_on,
                 size: 50,
