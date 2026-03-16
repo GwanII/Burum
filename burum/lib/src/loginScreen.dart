@@ -24,11 +24,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final storage = const FlutterSecureStorage();
 
-  // 현재 진행 중인 로딩 상태를 관리하는 변수 ('normal', 'Google', 'Kakao', 'Naver' 등)
-  String _loadingType = '';
-
-  // final String baseUrl = "http://localhost:3000/api/users";
-  final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
+   final String baseUrl = "http://localhost:3000/api/users";
+  //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   // 백엔드 API 호출 로직
   Future<void> _login() async {
@@ -164,7 +161,29 @@ class _LoginScreenState extends State<LoginScreen> {
       final responseData = jsonDecode(response.body);
 
       if (response.statusCode == 200) {
-        await _handleLoginSuccess(responseData);
+        final accessToken = responseData['accessToken'];
+        final refreshToken = responseData['refreshToken'];
+        final nickname = responseData['nickname'] ?? '익명';
+
+        final bool requiresLocation = responseData['requiresLocation'] ?? false;
+
+        await storage.write(key: 'accessToken', value: accessToken);
+        await storage.write(key: 'refreshToken', value: refreshToken);
+        await storage.write(key: 'nickname', value: nickname);
+
+        if (requiresLocation) {
+          _showMessage('동네 설정이 필요합니다.');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const LocationScreen()),
+          );
+        } else {
+          _showMessage('BURUM에 오신 것을 환영합니다!');
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(builder: (context) => const MainScreen()),
+          );
+        }
       } else {
         _showMessage(responseData['message'] ?? '구글 로그인 처리에 실패했습니다.');
       }

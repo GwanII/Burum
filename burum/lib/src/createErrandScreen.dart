@@ -36,6 +36,7 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
 class CreateErrandsPage extends StatefulWidget {
   const CreateErrandsPage({super.key});
 
+
   @override
   State<CreateErrandsPage> createState() => _CreateErrandsPageState();
 }
