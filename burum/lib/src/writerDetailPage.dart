@@ -2,6 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'createErrandScreen.dart';
 
+
+//제발 살려줘 
+
 class writerDetailPage extends StatelessWidget {
   // 1. 홈 화면에서 넘겨받을 데이터(택배 내용물)들을 선언해줍니다.
   final String title;
