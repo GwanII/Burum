@@ -21,8 +21,8 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final storage = const FlutterSecureStorage();
 
-  // final String baseUrl = "http://localhost:3000/api/users";
-  final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
+   final String baseUrl = "http://localhost:3000/api/users";
+  //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   // 백엔드 API 호출 로직
   Future<void> _login() async {
@@ -157,11 +157,13 @@ class _LoginScreenState extends State<LoginScreen> {
       if (response.statusCode == 200) {
         final accessToken = responseData['accessToken'];
         final refreshToken = responseData['refreshToken'];
+        final nickname = responseData['nickname'] ?? '익명';
 
         final bool requiresLocation = responseData['requiresLocation'] ?? false;
 
         await storage.write(key: 'accessToken', value: accessToken);
         await storage.write(key: 'refreshToken', value: refreshToken);
+        await storage.write(key: 'nickname', value: nickname);
 
         if (requiresLocation) {
           _showMessage('동네 설정이 필요합니다.');
