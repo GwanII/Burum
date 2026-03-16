@@ -2,4 +2,3 @@
 const int kCurrentUserId = 7;
 const String kBaseUrl = 'http://localhost:3000';
 
-//야호 ~ 
