@@ -5,10 +5,33 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:flutter_secure_storage/flutter_secure_storage.dart'; 
+import 'package:flutter/services.dart'; 
+
 // import 'dart:io'; // 💡 웹 에러의 원흉인 File 마법을 임시 봉인하오!
 // 이미지이미지이미지이미지이미지이미지이미지
 // import 'package:image_picker/image_picker.dart'; // 💡 사진 찍기 마법도 임시 봉인하오!
 // 이미지이미지이미지이미지이미지이미지이미지
+
+class ThousandsSeparatorInputFormatter extends TextInputFormatter {
+  @override
+  TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
+    if (newValue.text.isEmpty) return newValue;
+    String numericString = newValue.text.replaceAll(RegExp(r'[^0-9]'), '');
+    if (numericString.isEmpty) return newValue.copyWith(text: '');
+    
+    final buffer = StringBuffer();
+    for (int i = 0; i < numericString.length; i++) {
+      if (i > 0 && (numericString.length - i) % 3 == 0) buffer.write(',');
+      buffer.write(numericString[i]);
+    }
+    final formattedString = buffer.toString();
+    return newValue.copyWith(
+      text: formattedString,
+      selection: TextSelection.collapsed(offset: formattedString.length),
+    );
+  }
+}
 
 class CreateErrandsPage extends StatefulWidget {
   const CreateErrandsPage({super.key});
@@ -24,13 +47,11 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   final TextEditingController _titleController = TextEditingController();
   final TextEditingController _costController = TextEditingController();
   final TextEditingController _dateController = TextEditingController();
-  // 💡 스펠링 정화 완료! (_contextController -> _contentController)
   final TextEditingController _contentController = TextEditingController(); 
   final TextEditingController _locationController = TextEditingController(); 
   final TextEditingController _tagController = TextEditingController();
   List<String> _tags = [];
 
-  // 💡 File 대신 인터넷 주소(String)를 담는 가짜 창고로 변신!!!!!
   List<String> _selectedImages = []; 
   // 이미지이미지이미지이미지이미지이미지이미지
   
@@ -38,7 +59,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   // 이미지이미지이미지이미지이미지이미지이미지
   
   Future<void> _pickImages() async {
-    // 💡 갤러리를 여는 대신, 누를 때마다 예쁜 무작위 가짜 사진을 추가하오!!!!!
     setState(() {
       int remainingSlots = 10 - _selectedImages.length;
       if (remainingSlots <= 0) {
@@ -47,7 +67,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         );
         return;
       }
-      // 무작위 사진 URL 생성하여 배열에 쏙!
       _selectedImages.add('https://picsum.photos/100/100?random=${DateTime.now().millisecondsSinceEpoch}');
     });
   }
@@ -89,22 +108,63 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     });
   }
 
+  void _showErrorPopup(String message) {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+        title: const Text('⚠️ 등록 실패', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+        content: Text(message, style: const TextStyle(fontSize: 16)),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('확인', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+          ),
+        ],
+      ),
+    );
+  }
+
   Future<void> _submitErrand() async {
+    if (_titleController.text.length > 40) {
+      _showErrorPopup('제목은 40자를 초과할 수 없습니다.\n(현재: ${_titleController.text.length}자)');
+      return;
+    }
+    if (_contentController.text.length > 500) {
+      _showErrorPopup('내용은 500자를 초과할 수 없습니다.\n(현재: ${_contentController.text.length}자)');
+      return;
+    }
+
+    const storage = FlutterSecureStorage();
+    String? myAccessToken = await storage.read(key: 'accessToken');
+
+    if (myAccessToken == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('로그인을 먼저 해주세요.')),
+        );
+      }
+      return; 
+    }
+
     final url = Uri.parse('http://localhost:3000/api/createErrand');
     var request = http.MultipartRequest('POST', url);
-    request.fields['user_id'] = '1';
+    
+    request.headers['Authorization'] = 'Bearer $myAccessToken';
+
     request.fields['title'] = _titleController.text;
+    request.fields['content'] = _contentController.text; 
+    request.fields['location'] = _locationController.text;     
     
-    // 💡 스펠링 정화 완료! 백엔드와 똑같이 'content'라는 이름표를 달아주오!!!!!
-    request.fields['content'] = "${_contentController.text}\n(장소: ${_locationController.text})";
+    String rawCost = _costController.text.replaceAll(',', '');
+    request.fields['cost'] = rawCost.isEmpty ? '0' : rawCost;
     
-    request.fields['cost'] = _costController.text.isEmpty ? '0' : _costController.text;
     if (_dateController.text.isNotEmpty) {
       request.fields['deadline'] = _dateController.text;
     }
     request.fields['tags'] = jsonEncode(_tags);
     
-    // 💡 [웹 테스트용] 사진 파일을 보내는 대신, 가짜 텍스트 URL 하나만 쓱 밀어 넣소!!!!!
+    // 💡 [웹 테스트용 가짜 사진]
     request.fields['image_url'] = _selectedImages.isNotEmpty ? _selectedImages.first : "https://example.com/no-image.png";
     // 이미지이미지이미지이미지이미지이미지이미지
 
@@ -116,12 +176,12 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         print("🎉 등록 성공");
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🎉 심부름이 성공적으로 등록')),
+            const SnackBar(content: Text('🎉 심부름이 성공적으로 등록되었소!!!!!')),
           );
           Navigator.pop(context); 
         }
       } else {
-        print("적의 방어! 상태 코드: ${response.statusCode}");
+        print("상태 코드: ${response.statusCode}");
         print("에러 내용: ${response.body}"); 
       }
     } catch (e) {
@@ -134,7 +194,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     _titleController.dispose();
     _costController.dispose();
     _dateController.dispose();
-    _contentController.dispose(); // 💡 여기도 잊지 않고 고쳤소!
+    _contentController.dispose(); 
     _locationController.dispose();
     _tagController.dispose();
     super.dispose();
@@ -221,7 +281,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
             ),
             
             const SizedBox(height: 20),
-            _buildCustomTextField('제목을 입력해주세요', _titleController),
+            _buildCustomTextField('제목을 입력해주세요', _titleController, maxLength: 40),
             const SizedBox(height: 12),
             const Row(
               children: [
@@ -232,7 +292,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
             const SizedBox(height: 6),
             Row(
               children: [
-                Expanded(child: _buildCustomTextField('가격을 입력해주세요', _costController, isNumber: true)),
+                Expanded(child: _buildCustomTextField('가격을 입력해주세요', _costController, isNumber: true, formatters: [ThousandsSeparatorInputFormatter()])),
                 const SizedBox(width: 12),
                 Expanded(
                   child: GestureDetector(
@@ -246,11 +306,12 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
             ),
             const SizedBox(height: 12),
             Container(
-              height: 150,
               decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+              padding: const EdgeInsets.only(bottom: 8), 
               child: TextField(
-                controller: _contentController, // 💡 여기도 이름이 바뀌었소!!!!!
-                maxLines: null,
+                controller: _contentController, 
+                maxLines: 5,
+                maxLength: 500,
                 decoration: const InputDecoration(
                   hintText: '내용을 입력해주세요',
                   hintStyle: TextStyle(color: Colors.black54),
@@ -314,18 +375,20 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     );
   }
 
-  Widget _buildCustomTextField(String hint, TextEditingController controller, {bool isNumber = false}) {
+  Widget _buildCustomTextField(String hint, TextEditingController controller, {bool isNumber = false, int? maxLength, List<TextInputFormatter>? formatters}) {
     return Container(
-      height: 50,
       decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+      padding: EdgeInsets.only(bottom: maxLength != null ? 8 : 0), 
       child: TextField(
         controller: controller, 
         keyboardType: isNumber ? TextInputType.number : TextInputType.text, 
+        maxLength: maxLength,
+        inputFormatters: formatters,
         decoration: InputDecoration(
           hintText: hint,
           hintStyle: const TextStyle(color: Colors.black54),
           border: InputBorder.none,
-          contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+          contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
         ),
       ),
     );
