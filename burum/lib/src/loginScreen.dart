@@ -24,7 +24,9 @@ class _LoginScreenState extends State<LoginScreen> {
 
   final storage = const FlutterSecureStorage();
 
-   final String baseUrl = "http://localhost:3000/api/users";
+  String _loadingType = '';
+
+  final String baseUrl = "http://localhost:3000/api/users";
   //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   // 백엔드 API 호출 로직
