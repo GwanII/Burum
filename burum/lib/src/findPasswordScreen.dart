@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../config.dart';
 
 class FindPasswordScreen extends StatefulWidget {
   const FindPasswordScreen({super.key});
@@ -15,9 +16,6 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
   final TextEditingController _phoneController = TextEditingController();
   bool _isLoading = false;
   String? _errorMessage;
-
-  // final String baseUrl = "http://localhost:3000/api/users";
-  final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   final maskFormatter = MaskTextInputFormatter(
     mask: '###-####-####',
@@ -59,7 +57,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
       _isLoading = true;
     });
 
-    final url = Uri.parse('$baseUrl/reset-password');
+    final url = Uri.parse('${Config.baseUrl}/api/users/reset-password');
 
     try {
       // 실제 백엔드에 맞게 요청 형식을 수정 가능
