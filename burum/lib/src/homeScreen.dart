@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:flutter_secure_storage/flutter_secure_storage.dart'; // 🌟 추가: 저장소 패키지
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mapScreen.dart';
 import 'myPageScreen.dart';
 import 'postDetailScreen.dart';
-import 'writerDetailPage.dart'; // 🌟 추가: 내가 쓴 글일 때 넘어갈 페이지
+import 'writerDetailPage.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,8 +21,8 @@ class _HomeScreenState extends State<HomeScreen> {
   List<String> _trendingTags = [];
   bool _isLoading = true;
 
-  // 🌟 추가: 로그인한 유저 닉네임을 저장할 변수와 스토리지 객체
   String currentLoggedInUser = "";
+  String currentUserId = "";
   final storage = const FlutterSecureStorage();
 
   // ⚠️ 중요: 환경에 맞춰 주석 해제 (지금은 크롬/웹 기준)
@@ -32,23 +32,20 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    _loadUserNickname(); // 🌟 추가: 앱 시작할 때 내 닉네임 먼저 불러오기
+    _loadUserNickname();
     _fetchAllData();
   }
 
-  // 🌟 추가: 스토리지에서 내 닉네임 꺼내오는 함수
   Future<void> _loadUserNickname() async {
-    // 1. 금고에서 토큰 꺼내기
     final token =
         await storage.read(key: 'accessToken') ??
         await storage.read(key: 'FlutterSecureStorage.accessToken');
 
-    if (token == null) return; // 토큰이 없으면 그냥 종료
+    if (token == null) return;
 
     try {
-      // 2. 서버에 내 정보(프로필) 물어보기
       final response = await http.get(
-        Uri.parse('$baseUrl/posts/profile'), // 아까 설정해둔 baseUrl 사용!
+        Uri.parse('$baseUrl/posts/profile'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -58,8 +55,8 @@ class _HomeScreenState extends State<HomeScreen> {
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         setState(() {
-          // 3. 드디어 내 닉네임을 currentLoggedInUser에 저장!
           currentLoggedInUser = data['nickname'] ?? "";
+          currentUserId = data['id']?.toString() ?? data['user_id']?.toString() ?? "";
         });
       } else {
         print("서버 응답 에러: ${response.statusCode}");
@@ -237,6 +234,9 @@ class _HomeScreenState extends State<HomeScreen> {
                             return Column(
                               children: [
                                 _buildErrandItem(
+                                  // 🌟 핵심 추가 포인트 1: 백엔드 데이터에서 ID 뽑아내기
+                                  // 서버가 id, post_id, _id 중 무엇을 쓸지 몰라 방어적으로 작성했습니다.
+                                  postId: post['id']?.toString() ?? post['post_id']?.toString() ?? post['_id']?.toString() ?? '',
                                   title: post['title'] ?? '',
                                   desc: post['content'] ?? '',
                                   price: '${post['cost']}원',
@@ -299,6 +299,7 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildErrandItem({
+    required String postId, // 🌟 핵심 추가 포인트 2: 파라미터로 postId 받기
     required String title,
     required String desc,
     required String price,
@@ -309,19 +310,20 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return InkWell(
       onTap: () {
-        // 🌟 콘솔창에서 닉네임이 어떻게 들어오는지 확인하는 프린트문!
         print('====================================');
         print('👉 내 닉네임(currentLoggedInUser) : [$currentLoggedInUser]');
         print('👉 게시글 작성자(nickname) : [$nickname]');
         print('👉 둘이 완전히 똑같은가요? : ${nickname == currentLoggedInUser}');
         print('====================================');
 
-        // 🌟 핵심 변경 포인트: 내 닉네임과 글 작성자 닉네임이 같으면 수정 페이지로!
         if (currentLoggedInUser.isNotEmpty && nickname == currentLoggedInUser) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => writerDetailPage(
+                // 💡 만약 내가 쓴 글 페이지에서도 수정/삭제를 위해 postId가 필요하다면
+                // writerDetailPage 파일에 들어가서 postId 변수를 추가해주셔야 합니다!
+                // postId: postId, 
                 title: title,
                 content: desc,
                 price: price,
@@ -333,13 +335,14 @@ class _HomeScreenState extends State<HomeScreen> {
             ),
           );
         } else {
-          // 🌟 다르면 일반 상세 보기 페이지로!
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => PostDetailScreen(
+                postId: postId, // 🌟 핵심 추가 포인트 3: PostDetailScreen으로 postId 넘겨주기!
                 title: title,
                 content: desc,
+                currentUserId: currentUserId,
                 price: price,
                 date: deadlineInfo,
                 nickname: nickname,

@@ -24,8 +24,8 @@ class _SignupScreenState extends State<SignupScreen> {
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
 
-  // final String baseUrl = "http://localhost:3000/api/users";
-  final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
+   final String baseUrl = "http://localhost:3000/api/users";
+  //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   final maskFormatter = MaskTextInputFormatter(
     mask: '###-####-####',
