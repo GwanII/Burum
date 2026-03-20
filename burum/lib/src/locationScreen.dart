@@ -6,6 +6,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'main_Screen.dart';
+import '../config.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -25,9 +26,6 @@ class _LocationScreenState extends State<LocationScreen> {
   bool _isMapMoving = false; // 지도를 움직이는 중인지 체크
 
   final storage = const FlutterSecureStorage();
-
-   final String baseUrl = "http://localhost:3000/api/users";
-  //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   @override
   void initState() {
@@ -129,7 +127,7 @@ class _LocationScreenState extends State<LocationScreen> {
 
     try {
       final response = await http.patch(
-        Uri.parse('$baseUrl/location'),
+        Uri.parse('${Config.baseUrl}/api/users/location'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
