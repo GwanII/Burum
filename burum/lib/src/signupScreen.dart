@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter/services.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
+import '../config.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -23,9 +24,6 @@ class _SignupScreenState extends State<SignupScreen> {
   // 텍스트 필드의 텍스트 숨김 상태
   bool _isPasswordObscured = true;
   bool _isConfirmPasswordObscured = true;
-
-  // final String baseUrl = "http://localhost:3000/api/users";
-  final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
 
   final maskFormatter = MaskTextInputFormatter(
     mask: '###-####-####',
@@ -101,7 +99,7 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
 
-    final url = Uri.parse('$baseUrl/signup');
+    final url = Uri.parse('${Config.baseUrl}/api/users/signup');
 
     try {
       final response = await http.post(

@@ -9,6 +9,7 @@ import 'package:google_sign_in/google_sign_in.dart';
 import 'main_Screen.dart';
 import 'signupScreen.dart';
 import 'findPasswordScreen.dart'; // 새로 만든 파일 임포트
+import '../config.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -26,9 +27,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _loadingType = '';
 
-  final String baseUrl = "http://localhost:3000/api/users";
-  //final String baseUrl = "http://10.0.2.2:3000/api/users"; // 안드로이드 에뮬레이터용
-
   // 백엔드 API 호출 로직
   Future<void> _login() async {
     final String email = _emailController.text.trim();
@@ -43,7 +41,7 @@ class _LoginScreenState extends State<LoginScreen> {
       _loadingType = 'normal';
     });
 
-    final url = Uri.parse('$baseUrl/login');
+    final url = Uri.parse('${Config.baseUrl}/api/users/login');
 
     try {
       final response = await http.post(
@@ -151,7 +149,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 구글 로그인 API
   Future<void> _sendGoogleTokenToBackend(String idToken) async {
-    final url = Uri.parse('$baseUrl/google-login');
+    final url = Uri.parse('${Config.baseUrl}/api/users/google-login');
 
     try {
       final response = await http.post(
