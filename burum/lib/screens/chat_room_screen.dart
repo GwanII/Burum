@@ -15,7 +15,7 @@ import '../src/postDetailScreen.dart';
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom room;
 
-  const ChatRoomScreen({super.key, required this.room});
+  const ChatRoomScreen({super.key, required this.room,});
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -267,6 +267,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => PostDetailScreen(
+              postId: widget.room.postId.toString(), // 추가했어연 -기완
+              currentUserId: kCurrentUserId.toString(), // 추가했어연 -기완
               title: widget.room.postTitle ?? '게시물 정보 없음',
               content: widget.room.postContent ?? '내용 없음',
               price: '${widget.room.postCost ?? 0}',
