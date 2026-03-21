@@ -1,12 +1,13 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'createErrandScreen.dart';
+import 'applicantListPage.dart';
 
-
-//제발 살려줘 
+//제발 살려줘
 
 class writerDetailPage extends StatelessWidget {
   // 1. 홈 화면에서 넘겨받을 데이터(택배 내용물)들을 선언해줍니다.
+  final String postId;
   final String title;
   final String content;
   final String price;
@@ -18,6 +19,7 @@ class writerDetailPage extends StatelessWidget {
   // 2. 생성자(Constructor): "이 화면을 열려면 이 데이터들을 필수로 넣어줘!" 라는 뜻입니다.
   const writerDetailPage({
     super.key,
+    required this.postId,
     required this.title,
     required this.content,
     required this.price,
@@ -212,7 +214,12 @@ class writerDetailPage extends StatelessWidget {
               Expanded(
                 child: ElevatedButton(
                   onPressed: () {
-                    // TODO: 지원자 목록을 확인하는 화면으로 이동
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => ApplicantListPage(postId: postId),
+                      ),
+                    );
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: mainYellow,
