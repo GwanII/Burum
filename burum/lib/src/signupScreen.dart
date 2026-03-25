@@ -31,6 +31,16 @@ class _SignupScreenState extends State<SignupScreen> {
     type: MaskAutoCompletionType.lazy,
   );
 
+  @override
+  void dispose() {
+    _nicknameController.dispose();
+    _emailController.dispose();
+    _passwordController.dispose();
+    _confirmPasswordController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
   // 입력 필드 값이 변경될 때 해당 필드의 에러를 지우는 함수
   void _clearError(String key) {
     if (_errors.containsKey(key)) {

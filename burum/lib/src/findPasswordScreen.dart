@@ -23,6 +23,13 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
     type: MaskAutoCompletionType.lazy,
   );
 
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _phoneController.dispose();
+    super.dispose();
+  }
+
   Future<void> _findPassword() async {
     FocusScope.of(context).unfocus();
 

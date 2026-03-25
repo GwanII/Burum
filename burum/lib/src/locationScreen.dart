@@ -132,7 +132,11 @@ class _LocationScreenState extends State<LocationScreen> {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $accessToken',
         },
-        body: jsonEncode({'location': _currentDong}), // '가좌동' 등의 문자열 전송
+        body: jsonEncode({
+          'location': _currentDong,
+          'latitude': _mapCenterPosition.latitude,
+          'longitude': _mapCenterPosition.longitude,
+        }),
       );
 
       print(' 백엔드 응답 코드: ${response.statusCode}');
