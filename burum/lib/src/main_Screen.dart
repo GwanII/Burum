@@ -1,7 +1,9 @@
+import 'package:burum/src/createErrandScreen.dart';
 import 'package:flutter/material.dart';
 import 'homeScreen.dart';
 import 'myPageScreen.dart';
 import '../screens/chat_list_screen.dart';
+import 'calendarScreen.dart';
 
 // ㅁㄴㅇㄻㄴㅇㄻㄴㅇㄹㄴㅁㅇㅁㄹㄴㅇㄹ
 class MainScreen extends StatefulWidget {
@@ -20,8 +22,9 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     ChatListScreen(),
-    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
-    const Center(child: Text('캘린더 화면 (준비중)')), // 3번 탭 (임시)
+    const CreateErrandsPage(), // 2번 탭 (임시)
+//    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
+    const CalendarScreen(), // 3번 탭 (임시)
     const MyPageScreen(), // 4번 탭 (마이페이지)
   ];
 
