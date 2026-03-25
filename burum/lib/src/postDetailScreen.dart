@@ -33,8 +33,7 @@ class PostDetailScreen extends StatelessWidget {
   // 🌟 지원하기 버튼을 눌렀을 때 실행될 통신 함수!
   Future<void> _submitApplication(BuildContext context, String message) async {
     // 백엔드 API 주소 (상황에 맞게 수정하세요!)
-    final url = Uri.parse('${Config.baseUrl}/api/posts/applyErrand'); 
-    
+    final url = Uri.parse('${Config.baseUrl}/api/posts/applyErrand');
 
     // 임시 유저 ID (실제로는 로그인한 유저의 ID를 가져와야 합니다)
     try {
@@ -42,9 +41,9 @@ class PostDetailScreen extends StatelessWidget {
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'postId': postId,        // 어떤 게시물인지
+          'postId': postId, // 어떤 게시물인지
           'userId': currentUserId, // 누가 지원하는지
-          'message': message,      // 지원 멘트
+          'message': message, // 지원 멘트
         }),
       );
 
