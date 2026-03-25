@@ -22,6 +22,7 @@ class _LoginScreenState extends State<LoginScreen> {
   final TextEditingController _emailController = TextEditingController();
   final TextEditingController _passwordController = TextEditingController();
   bool _isPasswordObscured = true;
+  bool _isAutoLogin = false;
 
   final storage = const FlutterSecureStorage();
 
@@ -47,7 +48,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'email': email, 'password': password}),
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'autoLogin': _isAutoLogin, // 🌟 자동 로그인 여부 전송
+        }),
       );
 
       final responseData = jsonDecode(response.body);
@@ -61,6 +66,7 @@ class _LoginScreenState extends State<LoginScreen> {
       print('서버 통신 에러: $error');
       _showMessage('서버와 연결할 수 없습니다. 네트워크를 확인해주세요.');
     } finally {
+      // 에러가 뜨더라도 이 코드는 실행된다
       if (mounted) {
         setState(() {
           _loadingType = '';
@@ -77,13 +83,53 @@ class _LoginScreenState extends State<LoginScreen> {
   void initState() {
     super.initState();
     _initGoogle();
+    _checkAutoLogin(); // 화면 시작 시 자동 로그인 검사 실행
+  }
+
+  @override
+  void dispose() {
+    _emailController.dispose();
+    _passwordController.dispose();
+    super.dispose();
+  }
+
+  // 앱 구동 시 refreshToken을 확인하고 백엔드에 토큰 재발급 요청
+  Future<void> _checkAutoLogin() async {
+    final refreshToken = await storage.read(key: 'refreshToken');
+
+    if (refreshToken != null) {
+      setState(() {
+        _loadingType = 'autoLogin';
+      });
+
+      try {
+        final url = Uri.parse('${Config.baseUrl}/api/users/refresh');
+        final response = await http.post(
+          url,
+          headers: {'Content-Type': 'application/json'},
+          body: jsonEncode({'refreshToken': refreshToken}),
+        );
+
+        if (response.statusCode == 200) {
+          final responseData = jsonDecode(response.body);
+          await _handleLoginSuccess(responseData); // 성공 시 바로 화면 이동
+        } else {
+          // 토큰 만료 또는 유효하지 않은 경우 스토리지 비우기
+          await storage.deleteAll();
+          if (mounted) setState(() => _loadingType = '');
+        }
+      } catch (e) {
+        print('자동 로그인 에러: $e');
+        if (mounted) setState(() => _loadingType = '');
+      }
+    }
   }
 
   Future<void> _initGoogle() async {
     try {
       await _googleSignIn.initialize(
         serverClientId:
-            '1024833914093-ij5n6egqq31ibs4q9naivrrinqagc7pm.apps.googleusercontent.com',
+            '1024833914093-ij5n6egqq31ibs4q9naivrrinqagc7pm.apps.googleusercontent.com', // 보안 위험!! .env 파일이나 Config 클래스로 옮기는게 좋을듯
       );
       _isGoogleInit = true;
     } catch (e) {
@@ -155,7 +201,10 @@ class _LoginScreenState extends State<LoginScreen> {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'idToken': idToken}),
+        body: jsonEncode({
+          'idToken': idToken,
+          'autoLogin': _isAutoLogin, // 🌟 구글 로그인 시에도 자동 로그인 옵션 전달
+        }),
       );
 
       final responseData = jsonDecode(response.body);
@@ -235,6 +284,16 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 🌟 자동 로그인이 진행 중일 때, 깜빡임 방지를 위해 전체 화면 로딩 띄우기
+    if (_loadingType == 'autoLogin') {
+      return const Scaffold(
+        backgroundColor: Colors.white,
+        body: Center(
+          child: CircularProgressIndicator(color: Color(0xFFFF7E36)),
+        ),
+      );
+    }
+
     return Scaffold(
       backgroundColor: Colors.white,
       body: Center(
@@ -283,23 +342,42 @@ class _LoginScreenState extends State<LoginScreen> {
                 ),
               ),
 
-              // 🌟 비밀번호 찾기 텍스트 버튼 추가
-              Align(
-                alignment: Alignment.centerRight,
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const FindPasswordScreen(),
+              // 자동 로그인 체크박스 및 비밀번호 찾기 버튼
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Row(
+                    children: [
+                      Checkbox(
+                        value: _isAutoLogin,
+                        onChanged: (value) {
+                          setState(() {
+                            _isAutoLogin = value ?? false;
+                          });
+                        },
+                        activeColor: const Color(0xFFFF7E36),
                       ),
-                    );
-                  },
-                  child: Text(
-                    '비밀번호를 잊으셨나요?',
-                    style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                      Text(
+                        '자동 로그인',
+                        style: TextStyle(color: Colors.grey[700], fontSize: 13),
+                      ),
+                    ],
                   ),
-                ),
+                  TextButton(
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (context) => const FindPasswordScreen(),
+                        ),
+                      );
+                    },
+                    child: Text(
+                      '비밀번호를 잊으셨나요?',
+                      style: TextStyle(color: Colors.grey[600], fontSize: 13),
+                    ),
+                  ),
+                ],
               ),
 
               _buildRectButton(
