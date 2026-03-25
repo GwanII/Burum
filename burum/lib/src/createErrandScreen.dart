@@ -9,6 +9,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'homeScreen.dart';
 import 'postDetailScreen.dart';
+import '../config.dart';
 
 // import 'dart:io'; // 💡 웹 에러의 원흉인 File 마법을 임시 봉인하오!
 // 이미지이미지이미지이미지이미지이미지이미지
@@ -161,7 +162,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     const storage = FlutterSecureStorage();
     String? myAccessToken = await storage.read(key: 'accessToken');
     //추가 ?
-    String? myUserId = await storage.read(key: 'userId'); 
+    String? myUserId = await storage.read(key: 'userId');
     String? myNickname = await storage.read(key: 'nickname');
 
     if (myAccessToken == null) {
@@ -173,7 +174,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       return;
     }
 
-    final url = Uri.parse('http://localhost:3000/api/createErrand');
+    final url = Uri.parse('${Config.baseUrl}/api/createErrand');
     var request = http.MultipartRequest('POST', url);
 
     request.headers['Authorization'] = 'Bearer $myAccessToken';
@@ -203,7 +204,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         //추가
         var responseData = jsonDecode(response.body);
         String newPostId = responseData['errandId'].toString();
-        
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 심부름이 성공적으로 등록되었소!!!!!')),
