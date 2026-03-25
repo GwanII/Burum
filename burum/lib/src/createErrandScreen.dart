@@ -7,12 +7,15 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart'; 
 import 'package:flutter/services.dart'; 
+import 'homeScreen.dart'; 
+import 'postDetailScreen.dart';
 
 // import 'dart:io'; // 💡 웹 에러의 원흉인 File 마법을 임시 봉인하오!
 // 이미지이미지이미지이미지이미지이미지이미지
 // import 'package:image_picker/image_picker.dart'; // 💡 사진 찍기 마법도 임시 봉인하오!
 // 이미지이미지이미지이미지이미지이미지이미지
 
+// 🌟🌟🌟 천 단위로 쉼표(,)를 팍팍 찍어주는 요정!!!!! 🌟🌟🌟
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(TextEditingValue oldValue, TextEditingValue newValue) {
@@ -36,7 +39,6 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
 class CreateErrandsPage extends StatefulWidget {
   const CreateErrandsPage({super.key});
 
-
   @override
   State<CreateErrandsPage> createState() => _CreateErrandsPageState();
 }
@@ -54,9 +56,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   List<String> _tags = [];
 
   List<String> _selectedImages = []; 
-  // 이미지이미지이미지이미지이미지이미지이미지
-  
-  // final ImagePicker _picker = ImagePicker(); // 봉인!
   // 이미지이미지이미지이미지이미지이미지이미지
   
   Future<void> _pickImages() async {
@@ -78,7 +77,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       _selectedImages.removeAt(index);
     });
   }
-  // 이미지이미지이미지이미지이미지이미지이미지
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -109,6 +107,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     });
   }
 
+  // 🚨 [경고 팝업 소환 마법!!!!!]
   void _showErrorPopup(String message) {
     showDialog(
       context: context,
@@ -126,13 +125,14 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     );
   }
 
+  // 🚀 [진짜 토큰 & 장소/내용 분리형 궁극의 대포!!!!!]
   Future<void> _submitErrand() async {
     if (_titleController.text.length > 40) {
-      _showErrorPopup('제목은 40자를 초과할 수 없습니다.\n(현재: ${_titleController.text.length}자)');
+      _showErrorPopup('제목은 40자를 초과할 수 없소!!!!!\n(현재: ${_titleController.text.length}자)');
       return;
     }
     if (_contentController.text.length > 500) {
-      _showErrorPopup('내용은 500자를 초과할 수 없습니다.\n(현재: ${_contentController.text.length}자)');
+      _showErrorPopup('내용은 500자를 초과할 수 없소!!!!!\n(현재: ${_contentController.text.length}자)');
       return;
     }
 
@@ -142,7 +142,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     if (myAccessToken == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('로그인을 먼저 해주세요.')),
+          const SnackBar(content: Text('이단자여! 로그인을 먼저 하고 오시오!!!!!')),
         );
       }
       return; 
@@ -152,7 +152,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     var request = http.MultipartRequest('POST', url);
     
     request.headers['Authorization'] = 'Bearer $myAccessToken';
-
     request.fields['title'] = _titleController.text;
     request.fields['content'] = _contentController.text; 
     request.fields['location'] = _locationController.text;     
@@ -165,9 +164,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     }
     request.fields['tags'] = jsonEncode(_tags);
     
-    // 💡 [웹 테스트용 가짜 사진]
     request.fields['image_url'] = _selectedImages.isNotEmpty ? _selectedImages.first : "https://example.com/no-image.png";
-    // 이미지이미지이미지이미지이미지이미지이미지
 
     try {
       var streamedResponse = await request.send();
@@ -179,10 +176,25 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 심부름이 성공적으로 등록되었소!!!!!')),
           );
-          Navigator.pop(context); 
+          
+          // 🌟🌟🌟 [개조 완료: 동료 코드 보존을 위한 값 넘기기!!!!!] 🌟🌟🌟
+          Navigator.pushReplacement(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(
+                title: _titleController.text,
+                content: _contentController.text,
+                price: _costController.text.isEmpty ? '0원' : '${_costController.text}원',
+                date: _dateController.text.isEmpty ? '마감일 없음' : _dateController.text,
+                nickname: '나(작성자)', // 아직 로그인 정보가 없으므로 임시 설정!
+                tags: _tags,
+                imageUrl: _selectedImages.isNotEmpty ? _selectedImages.first : null,
+              ),
+            ),
+          );
         }
       } else {
-        print("상태 코드: ${response.statusCode}");
+        print("적의 방어! 상태 코드: ${response.statusCode}");
         print("에러 내용: ${response.body}"); 
       }
     } catch (e) {
@@ -203,173 +215,226 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: Colors.white,
-      appBar: AppBar(
-        backgroundColor: mainYellow,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.pop(context),
+    // 🌟🌟🌟 [궁극의 결계 PopScope 발동!!!!!] 🌟🌟🌟
+    return PopScope(
+      canPop: false, // 🛡️ 뒤로 가기를 일단 막아버리오!
+      onPopInvoked: (didPop) async {
+        if (didPop) return;
+        
+        bool? shouldLeave = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+            title: const Text('⚠️ 작성 취소 경고', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+            content: const Text('게시물 작성을 취소하시겠습니까?\n작성 중인 내용은 모두 사라집니다!', style: TextStyle(fontSize: 16)),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('아니오', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('예(나가기)', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+              ),
+            ],
+          ),
+        );
+
+        if (shouldLeave == true && context.mounted) {
+          Navigator.pushAndRemoveUntil(
+            context,
+            MaterialPageRoute(builder: (context) => const HomeScreen()), 
+            (route) => false,
+          );
+        }
+      },
+      child: Scaffold(
+        backgroundColor: Colors.white,
+        appBar: AppBar(
+          backgroundColor: mainYellow,
+          elevation: 0,
+          leading: IconButton(
+            icon: const Icon(Icons.arrow_back, color: Colors.black),
+            onPressed: () {
+              Navigator.maybePop(context); 
+            },
+          ),
+          title: const Text('게시물 생성', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+          centerTitle: true,
         ),
-        title: const Text('내 심부름', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
-        centerTitle: true,
-      ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            
-            SingleChildScrollView(
-              scrollDirection: Axis.horizontal,
-              child: Row(
-                children: [
-                  GestureDetector(
-                    onTap: _pickImages,
-                    // 이미지이미지이미지이미지이미지이미지이미지
-                    child: Container(
-                      width: 100,
-                      height: 100,
-                      margin: const EdgeInsets.only(right: 12),
-                      decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
+        body: SingleChildScrollView(
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              SingleChildScrollView(
+                scrollDirection: Axis.horizontal,
+                child: Row(
+                  children: [
+                    GestureDetector(
+                      onTap: _pickImages,
+                      child: Container(
+                        width: 100,
+                        height: 100,
+                        margin: const EdgeInsets.only(right: 12),
+                        decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            const Icon(Icons.camera_alt, color: Colors.black54),
+                            const SizedBox(height: 4),
+                            Text('${_selectedImages.length}/10', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          ],
+                        ),
+                      ),
+                    ),
+                    
+                    ..._selectedImages.asMap().entries.map((entry) {
+                      int index = entry.key;
+                      String fileUrl = entry.value; 
+                      return Stack(
                         children: [
-                          const Icon(Icons.camera_alt, color: Colors.black54),
-                          const SizedBox(height: 4),
-                          Text('${_selectedImages.length}/10', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                          Container(
+                            width: 100,
+                            height: 100,
+                            margin: const EdgeInsets.only(right: 12),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              image: DecorationImage(image: NetworkImage(fileUrl), fit: BoxFit.cover), 
+                            ),
+                          ),
+                          Positioned(
+                            right: 12,
+                            top: 0,
+                            child: GestureDetector(
+                              onTap: () => _removeImage(index),
+                              child: Container(
+                                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                padding: const EdgeInsets.all(4),
+                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                              ),
+                            ),
+                          ),
                         ],
+                      );
+                    }).toList(),
+                  ],
+                ),
+              ),
+              
+              const SizedBox(height: 20),
+              _buildCustomTextField('제목을 입력해주세요', _titleController, maxLength: 40),
+              const SizedBox(height: 12),
+              const Row(
+                children: [
+                  Text('AI ', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
+                  Text('가격 추천', style: TextStyle(color: Colors.grey, fontSize: 13)),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(child: _buildCustomTextField('가격을 입력해주세요', _costController, isNumber: true, formatters: [ThousandsSeparatorInputFormatter()])),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => _selectDate(context),
+                      child: AbsorbPointer(
+                        child: _buildCustomTextField('날짜 선택', _dateController),
                       ),
                     ),
                   ),
-                  
-                  ..._selectedImages.asMap().entries.map((entry) {
-                    int index = entry.key;
-                    String fileUrl = entry.value; 
-                    // 이미지이미지이미지이미지이미지이미지이미지
-                    
-                    return Stack(
-                      children: [
-                        Container(
-                          width: 100,
-                          height: 100,
-                          margin: const EdgeInsets.only(right: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(12),
-                            image: DecorationImage(image: NetworkImage(fileUrl), fit: BoxFit.cover), 
-                            // 이미지이미지이미지이미지이미지이미지이미지
-                          ),
-                        ),
-                        Positioned(
-                          right: 12,
-                          top: 0,
-                          child: GestureDetector(
-                            onTap: () => _removeImage(index),
-                            // 이미지이미지이미지이미지이미지이미지이미지
-                            child: Container(
-                              decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
-                              padding: const EdgeInsets.all(4),
-                              child: const Icon(Icons.close, color: Colors.white, size: 16),
-                            ),
-                          ),
-                        ),
-                      ],
-                    );
-                  }).toList(),
                 ],
               ),
-            ),
-            
-            const SizedBox(height: 20),
-            _buildCustomTextField('제목을 입력해주세요', _titleController, maxLength: 40),
-            const SizedBox(height: 12),
-            const Row(
-              children: [
-                Text('AI ', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
-                Text('가격 추천', style: TextStyle(color: Colors.grey, fontSize: 13)),
-              ],
-            ),
-            const SizedBox(height: 6),
-            Row(
-              children: [
-                Expanded(child: _buildCustomTextField('가격을 입력해주세요', _costController, isNumber: true, formatters: [ThousandsSeparatorInputFormatter()])),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: GestureDetector(
-                    onTap: () => _selectDate(context),
-                    child: AbsorbPointer(
-                      child: _buildCustomTextField('날짜 선택', _dateController),
-                    ),
+              const SizedBox(height: 12),
+              Container(
+                decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+                padding: const EdgeInsets.only(bottom: 8), 
+                child: TextField(
+                  controller: _contentController, 
+                  maxLines: 5, 
+                  maxLength: 500, 
+                  decoration: const InputDecoration(
+                    hintText: '내용을 입력해주세요',
+                    hintStyle: TextStyle(color: Colors.black54),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(16),
                   ),
                 ),
-              ],
-            ),
-            const SizedBox(height: 12),
-            Container(
-              decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
-              padding: const EdgeInsets.only(bottom: 8), 
-              child: TextField(
-                controller: _contentController, 
-                maxLines: 5,
-                maxLength: 500,
-                decoration: const InputDecoration(
-                  hintText: '내용을 입력해주세요',
-                  hintStyle: TextStyle(color: Colors.black54),
-                  border: InputBorder.none,
-                  contentPadding: EdgeInsets.all(16),
-                ),
               ),
-            ),
-            const SizedBox(height: 12),
-            TextField(
-              controller: _tagController,
-              decoration: InputDecoration(
-                hintText: '해시태그 입력 후 엔터',
-                filled: true,
-                fillColor: inputGrey,
-                border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
-                contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+              const SizedBox(height: 12),
+              TextField(
+                controller: _tagController,
+                decoration: InputDecoration(
+                  hintText: '해시태그 입력 후 엔터',
+                  filled: true,
+                  fillColor: inputGrey,
+                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  contentPadding: const EdgeInsets.symmetric(horizontal: 16),
+                  ),
+                  onSubmitted: _addTag,
                 ),
-                onSubmitted: _addTag,
+              const SizedBox(height: 8),
+              Wrap(
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _tags.map((tag) {
+                  return InputChip(
+                    label: Text(tag),
+                    backgroundColor: mainYellow,
+                    onDeleted: () => _removeTag(tag),
+                  );                
+                }).toList(),
               ),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8.0,
-              runSpacing: 4.0,
-              children: _tags.map((tag) {
-                return InputChip(
-                  label: Text(tag),
-                  backgroundColor: mainYellow,
-                  onDeleted: () => _removeTag(tag),
-                );                
-              }).toList(),
-            ),
 
-            const SizedBox(height: 24),
-            Row(
-              children: [
-                Expanded(child: _buildCustomTextField('장소를 입력 해주세요', _locationController)),
-                const SizedBox(width: 12),
-                const Icon(Icons.location_on_outlined, size: 40, color: Colors.black),
-              ],
-            ),
-            const SizedBox(height: 40),
-            
-            SizedBox(
-              width: double.infinity,
-              height: 56,
-              child: ElevatedButton(
-                onPressed: _submitErrand, 
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: mainYellow,
-                  elevation: 0,
-                  shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                ),
-                child: const Text('작성 완료', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+              const SizedBox(height: 24),
+              Row(
+                children: [
+                  Expanded(child: _buildCustomTextField('장소를 입력 해주세요', _locationController)),
+                  const SizedBox(width: 12),
+                  const Icon(Icons.location_on_outlined, size: 40, color: Colors.black),
+                ],
               ),
-            ),
-            const SizedBox(height: 20),
+              const SizedBox(height: 40),
+              
+              SizedBox(
+                width: double.infinity,
+                height: 56,
+                child: ElevatedButton(
+                  onPressed: _submitErrand, 
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: mainYellow,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                  child: const Text('작성 완료', style: TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                ),
+              ),
+              const SizedBox(height: 20),
+            ],
+          ),
+        ),
+        
+        bottomNavigationBar: BottomNavigationBar(
+          type: BottomNavigationBarType.fixed,
+          backgroundColor: const Color(0xFFFFF176), 
+          selectedItemColor: Colors.black, 
+          unselectedItemColor: Colors.black54,
+          selectedFontSize: 12,
+          unselectedFontSize: 12,
+          currentIndex: 2, 
+          onTap: (index) {
+            if (index == 2) return; 
+            
+            // 💡 다른 탭을 누르면, 스마트폰의 뒤로 가기를 누른 것과 똑같이 취급하여 팝업을 띄우오!
+            Navigator.maybePop(context); 
+          },
+          items: const [
+            BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: '홈'),
+            BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '채팅'),
+            BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: '심부름'),
+            BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: '캘린더'),
+            BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: '마이'),
           ],
         ),
       ),
