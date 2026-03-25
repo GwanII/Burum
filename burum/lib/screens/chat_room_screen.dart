@@ -8,6 +8,7 @@ import 'package:http/http.dart' as http;
 import '../chat_config.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
+import '../services/socket_service.dart';
 import '../widgets/message_bubble.dart';
 import 'profile_detail_screen.dart';
 import '../src/postDetailScreen.dart';
@@ -25,15 +26,68 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   List<Message> messages = [];
   final TextEditingController controller = TextEditingController();
   final ScrollController scrollController = ScrollController();
+  final SocketService socketService = SocketService();
 
   bool isSending = false;
   bool isUploadingImage = false;
+  bool isFetchingMessages = false;
 
   @override
   void initState() {
     super.initState();
+
+    socketService.connect(kBaseUrl, kCurrentUserId);
+    socketService.joinRoom(widget.room.roomId);
+
+    socketService.on('newMessage', (data) async {
+      if (!mounted || data == null) return;
+      if (data is! Map) return;
+
+      final map = Map<String, dynamic>.from(data);
+      if (map['chat_room_id'] != widget.room.roomId) return;
+
+      final incomingId = map['id'];
+      final alreadyExists = messages.any((m) => m.id == incomingId);
+      if (alreadyExists) return;
+
+      setState(() {
+        messages.add(Message.fromJson(map));
+      });
+
+      // 내가 현재 이 방에 있으니 들어온 메시지는 바로 읽음 처리
+      await markAsRead();
+
+      WidgetsBinding.instance.addPostFrameCallback((_) async {
+        await _scrollToBottom(animated: true);
+      });
+    });
+
+    socketService.on('messagesRead', (data) async {
+      if (!mounted || data == null) return;
+      if (data is! Map) return;
+
+      final map = Map<String, dynamic>.from(data);
+      if (map['roomId'] != widget.room.roomId) return;
+
+      // 내가 읽은 이벤트는 무시
+      if (map['userId'] == kCurrentUserId) return;
+
+      // 상대가 읽었으면 서버의 최신 is_read 값 다시 조회
+      await fetchMessages(refreshOnly: true);
+    });
+
     fetchMessages();
     markAsRead();
+  }
+
+  @override
+  void dispose() {
+    socketService.leaveRoom(widget.room.roomId);
+    socketService.off('newMessage');
+    socketService.off('messagesRead');
+    controller.dispose();
+    scrollController.dispose();
+    super.dispose();
   }
 
   void openProfileDetail() {
@@ -49,15 +103,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
   bool get hasPostPreview {
     return (widget.room.postId != null) ||
-        (widget.room.postTitle != null && widget.room.postTitle!.trim().isNotEmpty) ||
-        (widget.room.postImage != null && widget.room.postImage!.trim().isNotEmpty) ||
-        (widget.room.postContent != null && widget.room.postContent!.trim().isNotEmpty) ||
+        (widget.room.postTitle != null &&
+            widget.room.postTitle!.trim().isNotEmpty) ||
+        (widget.room.postImage != null &&
+            widget.room.postImage!.trim().isNotEmpty) ||
+        (widget.room.postContent != null &&
+            widget.room.postContent!.trim().isNotEmpty) ||
         (widget.room.postCost != null);
   }
 
   Future<void> _scrollToBottom({bool animated = true}) async {
     await Future.delayed(const Duration(milliseconds: 50));
-
     if (!scrollController.hasClients) return;
 
     final maxScroll = scrollController.position.maxScrollExtent;
@@ -73,7 +129,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     }
   }
 
-  Future<void> fetchMessages() async {
+  Future<void> fetchMessages({bool refreshOnly = false}) async {
+    if (isFetchingMessages) return;
+
+    isFetchingMessages = true;
+
     try {
       final response = await http.get(
         Uri.parse("$kBaseUrl/api/chat/messages/${widget.room.roomId}"),
@@ -82,45 +142,71 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
 
+        if (!mounted) return;
+
+        final fetchedMessages =
+            data.map((json) => Message.fromJson(json)).toList();
+
         setState(() {
-          messages = data.map((json) => Message.fromJson(json)).toList();
+          messages = fetchedMessages;
         });
 
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _scrollToBottom(animated: true);
-        });
+        if (!refreshOnly) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await _scrollToBottom(animated: true);
+          });
+        }
       }
     } catch (e) {
       debugPrint("fetchMessages error: $e");
+    } finally {
+      isFetchingMessages = false;
     }
   }
 
   Future<void> sendMessage() async {
     if (controller.text.trim().isEmpty || isSending) return;
 
+    final content = controller.text.trim();
+
     setState(() {
       isSending = true;
     });
 
     try {
-      await http.post(
+      final response = await http.post(
         Uri.parse("$kBaseUrl/api/chat/message"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "chatRoomId": widget.room.roomId,
           "senderId": kCurrentUserId,
-          "content": controller.text.trim(),
+          "content": content,
         }),
       );
 
-      controller.clear();
-      await fetchMessages();
-      await markAsRead();
-      await _scrollToBottom(animated: true);
+      if (response.statusCode == 200) {
+        controller.clear();
+      } else {
+        debugPrint("sendMessage failed: ${response.body}");
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
+          );
+        }
+      }
+    } catch (e) {
+      debugPrint("sendMessage error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
+        );
+      }
     } finally {
-      setState(() {
-        isSending = false;
-      });
+      if (mounted) {
+        setState(() {
+          isSending = false;
+        });
+      }
     }
   }
 
@@ -168,11 +254,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
 
-      if (response.statusCode == 200) {
-        await fetchMessages();
-        await markAsRead();
-        await _scrollToBottom(animated: true);
-      } else {
+      if (response.statusCode != 200) {
         debugPrint('image upload failed: ${response.body}');
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -197,14 +279,18 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> markAsRead() async {
-    await http.post(
-      Uri.parse("$kBaseUrl/api/chat/read"),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "roomId": widget.room.roomId,
-        "userId": kCurrentUserId,
-      }),
-    );
+    try {
+      await http.post(
+        Uri.parse("$kBaseUrl/api/chat/read"),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "roomId": widget.room.roomId,
+          "userId": kCurrentUserId,
+        }),
+      );
+    } catch (e) {
+      debugPrint("markAsRead error: $e");
+    }
   }
 
   String formatTime(DateTime time) {
