@@ -138,6 +138,9 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
 
     const storage = FlutterSecureStorage();
     String? myAccessToken = await storage.read(key: 'accessToken');
+    //추가 ?
+    String? myUserId = await storage.read(key: 'userId'); 
+    String? myNickname = await storage.read(key: 'nickname');
 
     if (myAccessToken == null) {
       if (mounted) {
@@ -172,6 +175,11 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
 
       if (response.statusCode == 201) {
         print("🎉 등록 성공");
+
+        //추가
+        var responseData = jsonDecode(response.body);
+        String newPostId = responseData['errandId'].toString();
+        
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 심부름이 성공적으로 등록되었소!!!!!')),
@@ -182,6 +190,10 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
             context,
             MaterialPageRoute(
               builder: (context) => PostDetailScreen(
+                //추가
+                postId: newPostId,
+                currentUserId: myUserId ?? '',
+                
                 title: _titleController.text,
                 content: _contentController.text,
                 price: _costController.text.isEmpty ? '0원' : '${_costController.text}원',
