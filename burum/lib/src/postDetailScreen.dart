@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:http/http.dart' as http; // 💡 서버 통신을 위한 마법책 추가!
 import 'dart:convert'; // 💡 JSON 변환용 마법책 추가!
+import '../config.dart';
 
 class PostDetailScreen extends StatelessWidget {
   // 1. 홈 화면에서 넘겨받을 데이터들
@@ -32,32 +33,45 @@ class PostDetailScreen extends StatelessWidget {
   // 🌟 지원하기 버튼을 눌렀을 때 실행될 통신 함수!
   Future<void> _submitApplication(BuildContext context, String message) async {
     // 백엔드 API 주소 (상황에 맞게 수정하세요!)
-    final url = Uri.parse('http://localhost:3000/api/posts/applyErrand');
+    final url = Uri.parse('${Config.baseUrl}/api/posts/applyErrand'); 
+    
 
     // 임시 유저 ID (실제로는 로그인한 유저의 ID를 가져와야 합니다)
-
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'postId': postId, // 어떤 게시물인지
+          'postId': postId,        // 어떤 게시물인지
           'userId': currentUserId, // 누가 지원하는지
-          'message': message, // 지원 멘트
+          'message': message,      // 지원 멘트
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 통신 성공!
+        // ✅ 1. 통신 성공 (처음 지원함)
         if (context.mounted) {
-          Navigator.pop(context); // 팝업 닫기
+          Navigator.pop(context); // 지원 팝업(다이얼로그) 닫기
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 지원이 성공적으로 완료되었습니다!')),
           );
         }
+      } else if (response.statusCode == 409) {
+        // 🛡️ 2. 중복 지원 방어 (이미 지원한 유저)
+        print("적의 방어! 상태 코드: 409 (중복 지원 시도)");
+        if (context.mounted) {
+          Navigator.pop(context); // 열려있는 창이 있다면 닫아주기
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(
+              content: Text('이미 지원한 심부름입니다! 🙅‍♂️'),
+              backgroundColor: Colors.orange, // 경고 느낌을 주려면 색상을 바꿔도 좋아요
+            ),
+          );
+        }
       } else {
-        // 통신 실패 (서버 에러 등)
+        // ❌ 3. 통신 실패 (기타 400, 500 등 서버 에러)
         print("적의 방어! 상태 코드: ${response.statusCode}");
+        print("서버의 답변: ${response.body}"); // 디버깅을 위해 서버 메시지도 출력!
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('앗! 지원에 실패했어요. 다시 시도해주세요.')),
@@ -65,11 +79,12 @@ class PostDetailScreen extends StatelessWidget {
         }
       }
     } catch (e) {
+      // 🔌 4. 아예 인터넷이 끊겼거나 서버가 꺼진 경우
       print("통신망 단절 에러: $e");
       if (context.mounted) {
-        ScaffoldMessenger.of(
-          context,
-        ).showSnackBar(const SnackBar(content: Text('네트워크 오류가 발생했습니다.')));
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('네트워크 오류가 발생했습니다. 서버 상태를 확인해주세요.')),
+        );
       }
     }
   }

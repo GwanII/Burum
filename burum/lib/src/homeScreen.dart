@@ -7,6 +7,8 @@ import 'mapScreen.dart';
 import 'myPageScreen.dart';
 import 'postDetailScreen.dart';
 import 'writerDetailPage.dart';
+import '../config.dart';
+
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -26,7 +28,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final storage = const FlutterSecureStorage();
 
   // ⚠️ 중요: 환경에 맞춰 주석 해제 (지금은 크롬/웹 기준)
-  final String baseUrl = "http://localhost:3000/api";
+  //final String baseUrl = "http://localhost:3000/api";
   // final String baseUrl = "http://10.0.2.2:3000/api"; // 안드로이드 에뮬레이터용
 
   @override
@@ -45,7 +47,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/posts/profile'),
+        Uri.parse('${Config.baseUrl}/api/posts/profile'),
         headers: {
           'Content-Type': 'application/json',
           'Authorization': 'Bearer $token',
@@ -75,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchPosts() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/posts'));
+      final response = await http.get(Uri.parse('${Config.baseUrl}/api/posts'));
       if (response.statusCode == 200) {
         setState(() {
           _posts = json.decode(response.body);
@@ -88,7 +90,7 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchTrendingTags() async {
     try {
-      final response = await http.get(Uri.parse('$baseUrl/posts/trending'));
+      final response = await http.get(Uri.parse('${Config.baseUrl}/api/posts/trending')); 
       if (response.statusCode == 200) {
         setState(() {
           _trendingTags = List<String>.from(json.decode(response.body));
@@ -323,7 +325,7 @@ class _HomeScreenState extends State<HomeScreen> {
               builder: (context) => writerDetailPage(
                 // 💡 만약 내가 쓴 글 페이지에서도 수정/삭제를 위해 postId가 필요하다면
                 // writerDetailPage 파일에 들어가서 postId 변수를 추가해주셔야 합니다!
-                // postId: postId, 
+                postId: postId, 
                 title: title,
                 content: desc,
                 price: price,
