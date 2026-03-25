@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 
 import '../chat_config.dart';
 import '../models/chat_room.dart';
+import '../services/socket_service.dart';
 import '../widgets/chat_tile.dart';
 import 'chat_room_screen.dart';
 
@@ -18,17 +19,48 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<ChatRoom> chatRooms = [];
   bool isLoading = true;
   bool showUnreadOnly = false;
+  final SocketService socketService = SocketService();
 
   @override
   void initState() {
     super.initState();
+
+    socketService.connect(kBaseUrl, kCurrentUserId);
+
+    socketService.on('chatRoomUpdated', (_) {
+      fetchChatRooms(showLoading: false);
+    });
+
+    socketService.on('chatRoomCreated', (_) {
+      fetchChatRooms(showLoading: false);
+    });
+
+    socketService.on('chatRoomDeleted', (_) {
+      fetchChatRooms(showLoading: false);
+    });
+
+    socketService.on('chatRoomPinned', (_) {
+      fetchChatRooms(showLoading: false);
+    });
+
     fetchChatRooms();
   }
 
-  Future<void> fetchChatRooms() async {
-    setState(() {
-      isLoading = true;
-    });
+  @override
+  void dispose() {
+    socketService.off('chatRoomUpdated');
+    socketService.off('chatRoomCreated');
+    socketService.off('chatRoomDeleted');
+    socketService.off('chatRoomPinned');
+    super.dispose();
+  }
+
+  Future<void> fetchChatRooms({bool showLoading = true}) async {
+    if (showLoading && mounted) {
+      setState(() {
+        isLoading = true;
+      });
+    }
 
     try {
       final response = await http.get(
@@ -55,17 +87,21 @@ class _ChatListScreenState extends State<ChatListScreen> {
           return bTime.compareTo(aTime);
         });
 
+        if (!mounted) return;
+
         setState(() {
           chatRooms = rooms;
           isLoading = false;
         });
       } else {
+        if (!mounted) return;
         setState(() {
           isLoading = false;
         });
       }
     } catch (e) {
       debugPrint('fetchChatRooms error: $e');
+      if (!mounted) return;
       setState(() {
         isLoading = false;
       });
@@ -76,7 +112,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     await http.delete(
       Uri.parse("$kBaseUrl/api/chat/rooms/$roomId?userId=$kCurrentUserId"),
     );
-    await fetchChatRooms();
+    await fetchChatRooms(showLoading: false);
   }
 
   Future<void> markRoomAsRead(int roomId) async {
@@ -88,7 +124,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         "userId": kCurrentUserId,
       }),
     );
-    await fetchChatRooms();
+    await fetchChatRooms(showLoading: false);
   }
 
   Future<void> togglePin(ChatRoom room) async {
@@ -100,7 +136,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         "isPinned": !room.isPinned,
       }),
     );
-    await fetchChatRooms();
+    await fetchChatRooms(showLoading: false);
   }
 
   Future<void> showRoomOptions(ChatRoom room) async {
@@ -192,7 +228,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: fetchChatRooms,
+              onRefresh: () => fetchChatRooms(showLoading: false),
               child: filteredRooms.isEmpty
                   ? ListView(
                       children: [
@@ -297,7 +333,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                                     builder: (_) => ChatRoomScreen(room: room),
                                   ),
                                 );
-                                fetchChatRooms();
+                                fetchChatRooms(showLoading: false);
                               },
                               onLongPress: () => showRoomOptions(room),
                             ),

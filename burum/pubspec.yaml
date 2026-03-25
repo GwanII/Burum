@@ -46,6 +46,7 @@ dependencies:
   geolocator: ^14.0.2
   geocoding: ^4.0.0
   table_calendar: ^3.2.0
+  socket_io_client: ^3.1.1
 
 dev_dependencies:
   flutter_test:
