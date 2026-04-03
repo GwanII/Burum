@@ -220,6 +220,17 @@ class _LoginScreenState extends State<LoginScreen> {
         await storage.write(key: 'refreshToken', value: refreshToken);
         await storage.write(key: 'nickname', value: nickname);
 
+        // 다은 작업 ** 채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
+        final userId =
+          responseData['userId'] ??
+          responseData['id'] ??
+         (responseData['user'] != null ? responseData['user']['id'] : null);
+
+        if (userId != null) {
+         await storage.write(key: 'userId', value: userId.toString());
+        }
+        //여기까징
+
         if (requiresLocation) {
           _showMessage('동네 설정이 필요합니다.');
           Navigator.pushReplacement(
@@ -246,7 +257,6 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLoginSuccess(Map<String, dynamic> responseData) async {
     final accessToken = responseData['accessToken'];
     final refreshToken = responseData['refreshToken'];
-
     // 토큰이 없는 경우 예외 처리
     if (accessToken == null || refreshToken == null) {
       _showMessage('로그인에 실패했습니다. (토큰 오류)');
@@ -255,6 +265,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
     await storage.write(key: 'accessToken', value: accessToken);
     await storage.write(key: 'refreshToken', value: refreshToken);
+
+  // 다은 작업 **채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
+  final userId =
+      responseData['userId'] ??
+      responseData['id'] ??
+      (responseData['user'] != null ? responseData['user']['id'] : null);
+
+  if (userId != null) {
+    await storage.write(key: 'userId', value: userId.toString());
+  }
+  // 여기까징 
 
     if (!mounted) return;
 
