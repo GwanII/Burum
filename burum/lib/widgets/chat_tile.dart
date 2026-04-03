@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../chat_config.dart';
+import '../config.dart';
 import '../models/chat_room.dart';
 
 class ChatTile extends StatelessWidget {
@@ -46,7 +46,7 @@ class ChatTile extends StatelessWidget {
         room.otherUserProfileImage!.isNotEmpty) {
       return CircleAvatar(
         radius: 28,
-        backgroundImage: NetworkImage("$kBaseUrl${room.otherUserProfileImage}"),
+        backgroundImage: NetworkImage("$Config.baseUrl${room.otherUserProfileImage}"),
       );
     }
 
@@ -80,7 +80,7 @@ class ChatTile extends StatelessWidget {
     return ClipRRect(
       borderRadius: BorderRadius.circular(8),
       child: Image.network(
-        "$kBaseUrl${room.postImage}",
+        "$Config.baseUrl${room.postImage}",
         width: 32,
         height: 32,
         fit: BoxFit.cover,
