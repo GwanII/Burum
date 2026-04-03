@@ -5,7 +5,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../chat_config.dart';
+import '../config.dart';
 import '../models/chat_room.dart';
 import '../models/message.dart';
 import '../services/socket_service.dart';
@@ -15,8 +15,13 @@ import '../src/postDetailScreen.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom room;
+  final int currentUserId;
 
-  const ChatRoomScreen({super.key, required this.room,});
+  const ChatRoomScreen({
+    super.key,
+    required this.room,
+    required this.currentUserId,
+  });
 
   @override
   State<ChatRoomScreen> createState() => _ChatRoomScreenState();
@@ -36,7 +41,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   void initState() {
     super.initState();
 
-    socketService.connect(kBaseUrl, kCurrentUserId);
+    socketService.connect(Config.baseUrl, widget.currentUserId);
     socketService.joinRoom(widget.room.roomId);
 
     socketService.on('newMessage', (data) async {
@@ -54,7 +59,6 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         messages.add(Message.fromJson(map));
       });
 
-      // 내가 현재 이 방에 있으니 들어온 메시지는 바로 읽음 처리
       await markAsRead();
 
       WidgetsBinding.instance.addPostFrameCallback((_) async {
@@ -69,10 +73,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       final map = Map<String, dynamic>.from(data);
       if (map['roomId'] != widget.room.roomId) return;
 
-      // 내가 읽은 이벤트는 무시
-      if (map['userId'] == kCurrentUserId) return;
+      if (map['userId'] == widget.currentUserId) return;
 
-      // 상대가 읽었으면 서버의 최신 is_read 값 다시 조회
       await fetchMessages(refreshOnly: true);
     });
 
@@ -136,7 +138,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     try {
       final response = await http.get(
-        Uri.parse("$kBaseUrl/api/chat/messages/${widget.room.roomId}"),
+        Uri.parse("$Config.baseUrl/api/chat/messages/${widget.room.roomId}"),
       );
 
       if (response.statusCode == 200) {
@@ -175,11 +177,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse("$kBaseUrl/api/chat/message"),
+        Uri.parse("$Config.baseUrl/api/chat/message"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "chatRoomId": widget.room.roomId,
-          "senderId": kCurrentUserId,
+          "senderId": widget.currentUserId,
           "content": content,
         }),
       );
@@ -239,10 +241,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse("$kBaseUrl/api/chat/image"),
+        Uri.parse("$Config.baseUrl/api/chat/image"),
       )
         ..fields['chatRoomId'] = widget.room.roomId.toString()
-        ..fields['senderId'] = kCurrentUserId.toString()
+        ..fields['senderId'] = widget.currentUserId.toString()
         ..files.add(
           http.MultipartFile.fromBytes(
             'image',
@@ -281,11 +283,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> markAsRead() async {
     try {
       await http.post(
-        Uri.parse("$kBaseUrl/api/chat/read"),
+        Uri.parse("$Config.baseUrl/api/chat/read"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": widget.room.roomId,
-          "userId": kCurrentUserId,
+          "userId": widget.currentUserId,
         }),
       );
     } catch (e) {
@@ -353,8 +355,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           context,
           MaterialPageRoute(
             builder: (_) => PostDetailScreen(
-              postId: widget.room.postId.toString(), // 추가했어연 -기완
-              currentUserId: kCurrentUserId.toString(), // 추가했어연 -기완
+              postId: widget.room.postId.toString(),
+              currentUserId: widget.currentUserId.toString(),
               title: widget.room.postTitle ?? '게시물 정보 없음',
               content: widget.room.postContent ?? '내용 없음',
               price: '${widget.room.postCost ?? 0}',
@@ -388,7 +390,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               child: widget.room.postImage != null &&
                       widget.room.postImage!.isNotEmpty
                   ? Image.network(
-                      "$kBaseUrl${widget.room.postImage}",
+                      "$Config.baseUrl${widget.room.postImage}",
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,
@@ -455,7 +457,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       child: imageUrl != null && imageUrl.isNotEmpty
           ? CircleAvatar(
               radius: 18,
-              backgroundImage: NetworkImage("$kBaseUrl$imageUrl"),
+              backgroundImage: NetworkImage("$Config.baseUrl$imageUrl"),
             )
           : CircleAvatar(
               radius: 18,
@@ -522,7 +524,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                             buildDateDivider(formatDateLabel(message.time)),
                           MessageBubble(
                             message: message,
-                            isMe: message.senderId == kCurrentUserId,
+                            isMe: message.senderId == widget.currentUserId,
                             otherUserNickname: widget.room.otherUserNickname,
                             otherUserProfileImage:
                                 widget.room.otherUserProfileImage,
