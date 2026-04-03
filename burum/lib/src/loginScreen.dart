@@ -1,15 +1,13 @@
-import 'package:burum/src/locationScreen.dart';
-import 'package:burum/theme.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:google_sign_in/google_sign_in.dart';
+import 'locationScreen.dart';
 import 'main_Screen.dart';
 import 'signupScreen.dart';
-import 'findPasswordScreen.dart'; // 새로 만든 파일 임포트
-import '../config.dart';
+import 'findPasswordScreen.dart';
+import '../dio_client.dart';
+import '../theme.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -42,29 +40,20 @@ class _LoginScreenState extends State<LoginScreen> {
       _loadingType = 'normal';
     });
 
-    final url = Uri.parse('${Config.baseUrl}/api/users/login');
-
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-          'autoLogin': _isAutoLogin, // 🌟 자동 로그인 여부 전송
-        }),
+      final response = await DioClient.instance.post(
+        '/api/users/login',
+        data: {'email': email, 'password': password, 'autoLogin': _isAutoLogin},
       );
 
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        await _handleLoginSuccess(responseData);
-      } else {
-        _showMessage(responseData['message'] ?? '로그인에 실패했습니다.');
-      }
-    } catch (error) {
+      await _handleLoginSuccess(response.data);
+    } on DioException catch (error) {
       print('서버 통신 에러: $error');
-      _showMessage('서버와 연결할 수 없습니다. 네트워크를 확인해주세요.');
+      if (error.response != null) {
+        _showMessage(error.response?.data['message'] ?? '로그인에 실패했습니다.');
+      } else {
+        _showMessage('서버와 연결할 수 없습니다. 네트워크를 확인해주세요.');
+      }
     } finally {
       // 에러가 뜨더라도 이 코드는 실행된다
       if (mounted) {
@@ -95,31 +84,26 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 앱 구동 시 refreshToken을 확인하고 백엔드에 토큰 재발급 요청
   Future<void> _checkAutoLogin() async {
+    // 1. 자동 로그인 옵션이 켜져있는지 확인
+    final isAutoLoginEnabled = await storage.read(key: 'autoLogin');
     final refreshToken = await storage.read(key: 'refreshToken');
 
-    if (refreshToken != null) {
+    // 2. 자동 로그인이 켜져있고, 리프레시 토큰이 있을 때만 자동 로그인 시도
+    if (isAutoLoginEnabled == 'true' && refreshToken != null) {
       setState(() {
         _loadingType = 'autoLogin';
       });
 
       try {
-        final url = Uri.parse('${Config.baseUrl}/api/users/refresh');
-        final response = await http.post(
-          url,
-          headers: {'Content-Type': 'application/json'},
-          body: jsonEncode({'refreshToken': refreshToken}),
+        final response = await DioClient.instance.post(
+          '/api/users/refresh',
+          data: {'refreshToken': refreshToken},
         );
-
-        if (response.statusCode == 200) {
-          final responseData = jsonDecode(response.body);
-          await _handleLoginSuccess(responseData); // 성공 시 바로 화면 이동
-        } else {
-          // 토큰 만료 또는 유효하지 않은 경우 스토리지 비우기
-          await storage.deleteAll();
-          if (mounted) setState(() => _loadingType = '');
-        }
+        await _handleLoginSuccess(response.data); // 성공 시 바로 화면 이동
       } catch (e) {
         print('자동 로그인 에러: $e');
+        // 토큰 만료 또는 유효하지 않은 경우 스토리지 비우기
+        await storage.deleteAll();
         if (mounted) setState(() => _loadingType = '');
       }
     }
@@ -195,32 +179,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 구글 로그인 API
   Future<void> _sendGoogleTokenToBackend(String idToken) async {
-    final url = Uri.parse('${Config.baseUrl}/api/users/google-login');
-
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await DioClient.instance.post(
+        '/api/users/google-login',
+        data: {
           'idToken': idToken,
           'autoLogin': _isAutoLogin, // 🌟 구글 로그인 시에도 자동 로그인 옵션 전달
-        }),
+        },
       );
-
-      final responseData = jsonDecode(response.body);
-
-      if (response.statusCode == 200) {
-        final accessToken = responseData['accessToken'];
-        final refreshToken = responseData['refreshToken'];
-        final nickname = responseData['nickname'] ?? '익명';
-
-        final bool requiresLocation = responseData['requiresLocation'] ?? false;
-
-        await storage.write(key: 'accessToken', value: accessToken);
-        await storage.write(key: 'refreshToken', value: refreshToken);
-        await storage.write(key: 'nickname', value: nickname);
-
-        // 다은 작업 ** 채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
+      // 다은 작업 ** 채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
         final userId =
           responseData['userId'] ??
           responseData['id'] ??
@@ -230,26 +197,14 @@ class _LoginScreenState extends State<LoginScreen> {
          await storage.write(key: 'userId', value: userId.toString());
         }
         //여기까징
-
-        if (requiresLocation) {
-          _showMessage('동네 설정이 필요합니다.');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const LocationScreen()),
-          );
-        } else {
-          _showMessage('BURUM에 오신 것을 환영합니다!');
-          Navigator.pushReplacement(
-            context,
-            MaterialPageRoute(builder: (context) => const MainScreen()),
-          );
-        }
-      } else {
-        _showMessage(responseData['message'] ?? '구글 로그인 처리에 실패했습니다.');
-      }
-    } catch (err) {
+      await _handleLoginSuccess(response.data);
+    } on DioException catch (err) {
       print('백엔드 통신 에러: $err');
-      _showMessage('서버와 연결할 수 없습니다. 백엔드가 켜져있는지 확인해주세요.');
+      if (err.response != null) {
+        _showMessage(err.response?.data['message'] ?? '구글 로그인 처리에 실패했습니다.');
+      } else {
+        _showMessage('서버와 연결할 수 없습니다. 백엔드가 켜져있는지 확인해주세요.');
+      }
     }
   }
 
@@ -257,6 +212,8 @@ class _LoginScreenState extends State<LoginScreen> {
   Future<void> _handleLoginSuccess(Map<String, dynamic> responseData) async {
     final accessToken = responseData['accessToken'];
     final refreshToken = responseData['refreshToken'];
+    final nickname = responseData['nickname'] ?? '익명';
+
     // 토큰이 없는 경우 예외 처리
     if (accessToken == null || refreshToken == null) {
       _showMessage('로그인에 실패했습니다. (토큰 오류)');
@@ -265,6 +222,15 @@ class _LoginScreenState extends State<LoginScreen> {
 
     await storage.write(key: 'accessToken', value: accessToken);
     await storage.write(key: 'refreshToken', value: refreshToken);
+    // 🌟 자동 로그인 체크 여부를 저장
+    await storage.write(
+      key: 'autoLogin',
+      value: _isAutoLogin.toString(),
+    ); // flutter_secure_stroage의 key와 value는 String타입만 저장 가능
+
+    if (nickname != '익명') {
+      await storage.write(key: 'nickname', value: nickname);
+    }
 
   // 다은 작업 **채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
   final userId =
@@ -310,7 +276,7 @@ class _LoginScreenState extends State<LoginScreen> {
       return const Scaffold(
         backgroundColor: Colors.white,
         body: Center(
-          child: CircularProgressIndicator(color: Color(0xFFFF7E36)),
+          child: CircularProgressIndicator(color: AppTheme.pointOrange),
         ),
       );
     }
@@ -327,7 +293,7 @@ class _LoginScreenState extends State<LoginScreen> {
               Icon(
                 Icons.storefront_rounded,
                 size: 72,
-                color: Color(0xFFFF7E36),
+                color: AppTheme.pointOrange,
               ),
               SizedBox(height: 16),
               Text(
@@ -376,7 +342,7 @@ class _LoginScreenState extends State<LoginScreen> {
                             _isAutoLogin = value ?? false;
                           });
                         },
-                        activeColor: const Color(0xFFFF7E36),
+                        activeColor: AppTheme.pointOrange,
                       ),
                       Text(
                         '자동 로그인',
@@ -404,7 +370,7 @@ class _LoginScreenState extends State<LoginScreen> {
               _buildRectButton(
                 '로그인',
                 _loadingType.isNotEmpty ? null : _login,
-                Color(0xFFE8E8E8),
+                AppTheme.buttonGrey,
                 Colors.black,
                 isLoading: _loadingType == 'normal',
               ),
@@ -423,7 +389,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           ),
                         );
                       },
-                Color(0xFFF5F5F5),
+                AppTheme.lightGrey,
                 Colors.black54,
               ),
 
@@ -449,7 +415,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
               _buildRoundedButton(
                 '구글로 계속하기',
-                Color(0xFFF2F2F2),
+                AppTheme.googleButtonColor,
                 Colors.black87,
                 _loadingType.isNotEmpty ? null : () => _socialLogin('Google'),
                 isLoading: _loadingType == 'Google',
@@ -457,7 +423,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(height: 12),
               _buildRoundedButton(
                 '카카오로 계속하기',
-                Color(0xFFFEE500),
+                AppTheme.kakaoButtonColor,
                 Colors.black87,
                 _loadingType.isNotEmpty ? null : () => _socialLogin('Kakao'),
                 isLoading: _loadingType == 'Kakao',
@@ -465,7 +431,7 @@ class _LoginScreenState extends State<LoginScreen> {
               SizedBox(height: 12),
               _buildRoundedButton(
                 '네이버로 계속하기',
-                Color(0xFF03C75A),
+                AppTheme.naverButtonColor,
                 Colors.white,
                 _loadingType.isNotEmpty ? null : () => _socialLogin('Naver'),
                 isLoading: _loadingType == 'Naver',
@@ -492,14 +458,14 @@ class _LoginScreenState extends State<LoginScreen> {
         suffixIcon: suffixIcon,
         hintStyle: TextStyle(color: Colors.grey[500]),
         filled: true,
-        fillColor: Color(0xFFF8F8F8),
+        fillColor: AppTheme.textFieldBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: Color(0xFFFF7E36), width: 1.5),
+          borderSide: BorderSide(color: AppTheme.pointOrange, width: 1.5),
         ),
         contentPadding: EdgeInsets.symmetric(vertical: 18, horizontal: 16),
       ),

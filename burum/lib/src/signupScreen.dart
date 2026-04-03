@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter/services.dart';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
-import '../config.dart';
+import '../dio_client.dart';
+import '../theme.dart';
 
 class SignupScreen extends StatefulWidget {
   const SignupScreen({super.key});
@@ -109,34 +109,41 @@ class _SignupScreenState extends State<SignupScreen> {
     }
     setState(() => _isLoading = true);
 
-    final url = Uri.parse('${Config.baseUrl}/api/users/signup');
-
     try {
-      final response = await http.post(
-        url,
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
+      final response = await DioClient.instance.post(
+        '/api/users/signup',
+        data: {
           'nickname': nickname,
           'email': email,
           'password': password,
           'phone': phone,
-        }),
+        },
       );
 
-      print('${response.body}');
+      print('${response.data}');
 
-      final responseData = jsonDecode(response.body);
+      // 통신 대기 중 사용자가 화면을 나갔다면 이후 로직 실행 안함
+      if (!mounted) return;
 
       // 가입 성공 시 201 상태 코드 보냄
-      if (response.statusCode == 201) {
+      if (response.statusCode == 201 || response.statusCode == 200) {
         _showMessage('회원가입이 완료되었습니다!');
         // 가입 성공 시 뒤로가기(로그인 화면으로 복귀)
         Navigator.pop(context);
       } else {
-        _showMessage(responseData['message'] ?? '회원가입 실패');
+        _showMessage(response.data['message'] ?? '회원가입 실패');
+      }
+    } on DioException catch (error) {
+      print(error);
+      if (!mounted) return;
+      if (error.response != null) {
+        _showMessage(error.response?.data['message'] ?? '회원가입 실패');
+      } else {
+        _showMessage('서버와 연결할 수 없습니다.');
       }
     } catch (error) {
       print(error);
+      if (!mounted) return;
       _showMessage('서버와 연결할 수 없습니다.');
     } finally {
       if (mounted) {
@@ -250,7 +257,7 @@ class _SignupScreenState extends State<SignupScreen> {
             ElevatedButton(
               onPressed: _isLoading ? null : _signup,
               style: ElevatedButton.styleFrom(
-                backgroundColor: Color(0xFFFF7E36),
+                backgroundColor: AppTheme.pointOrange,
                 foregroundColor: Colors.white,
                 // disabledBackgroundColor: AppTheme.primaryColor.withOpacity(0.5),
                 elevation: 0,
@@ -304,14 +311,14 @@ class _SignupScreenState extends State<SignupScreen> {
         suffixIcon: suffixIcon,
         hintStyle: TextStyle(color: Colors.grey[500]),
         filled: true,
-        fillColor: Color(0xFFF8F8F8),
+        fillColor: AppTheme.textFieldBackground,
         border: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
           borderSide: BorderSide.none,
         ),
         focusedBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),
-          borderSide: BorderSide(color: Color(0xFFFF7E36), width: 1.5),
+          borderSide: BorderSide(color: AppTheme.pointOrange, width: 1.5),
         ),
         errorBorder: OutlineInputBorder(
           borderRadius: BorderRadius.circular(8.0),

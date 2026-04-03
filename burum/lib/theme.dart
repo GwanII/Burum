@@ -12,6 +12,20 @@ class AppTheme {
   // 입력창 배경색
   static const Color inputBarColor = Color(0xFFFFF3B0);
 
+  // 공통 브랜드/포인트 색상
+  static const Color pointOrange = Color(0xFFFF7E36); // 주요 오렌지색
+  static const Color pointMint = Color(0xFF5ADBB5); // 민트색
+
+  // 텍스트 필드 및 버튼 배경색
+  static const Color textFieldBackground = Color(0xFFF8F8F8);
+  static const Color buttonGrey = Color(0xFFE8E8E8);
+  static const Color lightGrey = Color(0xFFF5F5F5);
+
+  // 소셜 로그인 버튼 색상
+  static const Color googleButtonColor = Color(0xFFF2F2F2);
+  static const Color kakaoButtonColor = Color(0xFFFEE500);
+  static const Color naverButtonColor = Color(0xFF03C75A);
+
   static ThemeData themeData = ThemeData(
     primaryColor: primaryColor,
     scaffoldBackgroundColor: backgroundColor,

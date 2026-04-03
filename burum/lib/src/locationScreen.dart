@@ -2,11 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'main_Screen.dart';
-import '../config.dart';
+import '../dio_client.dart';
+import '../theme.dart';
 
 class LocationScreen extends StatefulWidget {
   const LocationScreen({super.key});
@@ -126,36 +126,39 @@ class _LocationScreenState extends State<LocationScreen> {
     }
 
     try {
-      final response = await http.patch(
-        Uri.parse('${Config.baseUrl}/api/users/location'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $accessToken',
-        },
-        body: jsonEncode({
+      final response = await DioClient.instance.patch(
+        '/api/users/location',
+        data: {
           'location': _currentDong,
           'latitude': _mapCenterPosition.latitude,
           'longitude': _mapCenterPosition.longitude,
-        }),
+        },
       );
 
       print(' 백엔드 응답 코드: ${response.statusCode}');
-      print(' 백엔드 응답 내용: ${response.body}');
+      print(' 백엔드 응답 내용: ${response.data}');
 
-      if (response.statusCode == 200) {
-        _showMessage('$_currentDong 인증이 완료되었습니다! 🎉');
-        // 인증 성공 시 메인 화면으로 이동
-        Navigator.pushReplacement(
-          context,
-          MaterialPageRoute(builder: (context) => const MainScreen()),
-        );
+      // 화면이 닫혔다면 UI 조작을 중단하여 에러 방지
+      if (!mounted) return;
+
+      _showMessage('$_currentDong 인증이 완료되었습니다! 🎉');
+      // 인증 성공 시 메인 화면으로 이동
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const MainScreen()),
+      );
+    } on DioException catch (error) {
+      print('위치 인증 통신 에러: $error');
+      if (!mounted) return;
+      if (error.response != null) {
+        _showMessage(error.response?.data['message'] ?? '위치 인증에 실패했습니다.');
       } else {
-        final errorData = jsonDecode(response.body);
-        _showMessage(errorData['message'] ?? '위치 인증에 실패했습니다.');
-        setState(() => _isLoading = false);
+        _showMessage('서버 통신 에러가 발생했습니다.');
       }
+      setState(() => _isLoading = false);
     } catch (error) {
       print('위치 인증 통신 에러: $error');
+      if (!mounted) return;
       _showMessage('서버 통신 에러가 발생했습니다.');
       setState(() => _isLoading = false);
     }
@@ -221,7 +224,7 @@ class _LocationScreenState extends State<LocationScreen> {
               child: Icon(
                 Icons.location_on,
                 size: 50,
-                color: const Color(0xFFFF7E36),
+                color: AppTheme.pointOrange,
               ), // 당근마켓/BURUM 테마색
             ),
           ),
@@ -270,7 +273,7 @@ class _LocationScreenState extends State<LocationScreen> {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  const Divider(thickness: 1, color: Color(0xFFE8E8E8)),
+                  const Divider(thickness: 1, color: AppTheme.buttonGrey),
                   const SizedBox(height: 12),
 
                   // 현재 위치 텍스트
@@ -292,7 +295,7 @@ class _LocationScreenState extends State<LocationScreen> {
                           ? null
                           : _verifyLocation,
                       style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF5ADBB5), // 사진 속 민트색
+                        backgroundColor: AppTheme.pointMint, // 사진 속 민트색
                         disabledBackgroundColor: Colors.grey[300], // 비활성화 시 색상
                         foregroundColor: Colors.black87,
                         padding: const EdgeInsets.symmetric(vertical: 16),
