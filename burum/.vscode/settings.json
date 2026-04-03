@@ -1,3 +1,4 @@
 {
-    "cmake.sourceDirectory": "C:/Burum/burum/linux"
+    "cmake.sourceDirectory": "C:/Burum/burum/linux",
+    "editor.semanticHighlighting.enabled": false
 }
