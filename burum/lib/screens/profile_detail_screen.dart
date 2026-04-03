@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 
-import '../chat_config.dart';
+import '../config.dart';
 
 class ProfileDetailScreen extends StatefulWidget {
   final int userId;
@@ -28,7 +28,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   Future<void> fetchProfile() async {
     try {
       final response = await http.get(
-        Uri.parse("$kBaseUrl/api/users/profile/${widget.userId}"),
+        Uri.parse("$Config.baseUrl/api/users/profile/${widget.userId}"),
       );
 
       if (response.statusCode == 200) {
@@ -74,7 +74,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
 
     return CircleAvatar(
       radius: 42,
-      backgroundImage: NetworkImage("$kBaseUrl$imageUrl"),
+      backgroundImage: NetworkImage("$Config.baseUrl$imageUrl"),
     );
   }
 
@@ -95,7 +95,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
             borderRadius: BorderRadius.circular(10),
             child: imageUrl != null && imageUrl.toString().isNotEmpty
                 ? Image.network(
-                    "$kBaseUrl$imageUrl",
+                    "$Config.baseUrl$imageUrl",
                     width: 54,
                     height: 54,
                     fit: BoxFit.cover,

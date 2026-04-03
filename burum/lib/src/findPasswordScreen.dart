@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:mask_text_input_formatter/mask_text_input_formatter.dart';
 import '../config.dart';
+import '../theme.dart';
 
 class FindPasswordScreen extends StatefulWidget {
   const FindPasswordScreen({super.key});
@@ -145,7 +146,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
                 errorText: _errorMessage,
                 hintStyle: TextStyle(color: Colors.grey[500]),
                 filled: true,
-                fillColor: const Color(0xFFF8F8F8),
+                fillColor: AppTheme.textFieldBackground,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                   borderSide: BorderSide.none,
@@ -153,7 +154,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                   borderSide: const BorderSide(
-                    color: Color(0xFFFF7E36),
+                    color: AppTheme.pointOrange,
                     width: 1.5,
                   ),
                 ),
@@ -176,7 +177,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
                 errorText: _errorMessage,
                 hintStyle: TextStyle(color: Colors.grey[500]),
                 filled: true,
-                fillColor: const Color(0xFFF8F8F8),
+                fillColor: AppTheme.textFieldBackground,
                 border: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                   borderSide: BorderSide.none,
@@ -184,7 +185,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
                 focusedBorder: OutlineInputBorder(
                   borderRadius: BorderRadius.circular(8.0),
                   borderSide: const BorderSide(
-                    color: Color(0xFFFF7E36),
+                    color: AppTheme.pointOrange,
                     width: 1.5,
                   ),
                 ),
@@ -198,7 +199,7 @@ class _FindPasswordScreenState extends State<FindPasswordScreen> {
             ElevatedButton(
               onPressed: _isLoading ? null : _findPassword,
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF7E36),
+                backgroundColor: AppTheme.pointOrange,
                 foregroundColor: Colors.white,
                 elevation: 0,
                 padding: const EdgeInsets.symmetric(vertical: 16),

@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../chat_config.dart';
+import '../config.dart';
 import '../models/message.dart';
 
 class MessageBubble extends StatelessWidget {
@@ -30,7 +30,7 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
-    final imageUrl = "$kBaseUrl${message.imageUrl}";
+    final imageUrl = "$Config.baseUrl${message.imageUrl}";
 
     return GestureDetector(
       onTap: () => _openFullScreenImage(context, imageUrl),
@@ -59,7 +59,7 @@ class MessageBubble extends StatelessWidget {
     if (otherUserProfileImage != null && otherUserProfileImage!.isNotEmpty) {
       return CircleAvatar(
         radius: 16,
-        backgroundImage: NetworkImage("$kBaseUrl$otherUserProfileImage"),
+        backgroundImage: NetworkImage("$Config.baseUrl$otherUserProfileImage"),
       );
     }
 

@@ -7,7 +7,7 @@ import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
-import 'homeScreen.dart';
+import 'main_Screen.dart';
 import 'postDetailScreen.dart';
 import '../config.dart';
 
@@ -308,7 +308,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         if (shouldLeave == true && context.mounted) {
           Navigator.pushAndRemoveUntil(
             context,
-            MaterialPageRoute(builder: (context) => const HomeScreen()),
+            MaterialPageRoute(builder: (context) => const MainScreen()),
             (route) => false,
           );
         }
