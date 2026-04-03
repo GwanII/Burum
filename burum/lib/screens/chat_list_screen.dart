@@ -1,8 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-import '../chat_config.dart';
+import '../config.dart';
 import '../models/chat_room.dart';
 import '../services/socket_service.dart';
 import '../widgets/chat_tile.dart';
@@ -19,13 +20,16 @@ class _ChatListScreenState extends State<ChatListScreen> {
   List<ChatRoom> chatRooms = [];
   bool isLoading = true;
   bool showUnreadOnly = false;
+
   final SocketService socketService = SocketService();
+  final FlutterSecureStorage storage = const FlutterSecureStorage();
+
+  int? currentUserId;
+  bool socketConnected = false;
 
   @override
   void initState() {
     super.initState();
-
-    socketService.connect(kBaseUrl, kCurrentUserId);
 
     socketService.on('chatRoomUpdated', (_) {
       fetchChatRooms(showLoading: false);
@@ -43,7 +47,28 @@ class _ChatListScreenState extends State<ChatListScreen> {
       fetchChatRooms(showLoading: false);
     });
 
-    fetchChatRooms();
+    _initializeChatList();
+  }
+
+  Future<void> _initializeChatList() async {
+    final userIdString = await storage.read(key: 'userId');
+    final parsedUserId = int.tryParse(userIdString ?? '');
+
+    if (!mounted) return;
+
+    if (parsedUserId == null) {
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    currentUserId = parsedUserId;
+
+    socketService.connect(Config.baseUrl, currentUserId!);
+    socketConnected = true;
+
+    await fetchChatRooms();
   }
 
   @override
@@ -55,84 +80,107 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.dispose();
   }
 
-  Future<void> fetchChatRooms({bool showLoading = true}) async {
-    if (showLoading && mounted) {
-      setState(() {
-        isLoading = true;
-      });
-    }
+    Future<void> fetchChatRooms({bool showLoading = true}) async {
+  if (currentUserId == null) return;
 
-    try {
-      final response = await http.get(
-        Uri.parse("$kBaseUrl/api/chat/rooms/$kCurrentUserId"),
-      );
+  if (showLoading && mounted) {
+    setState(() {
+      isLoading = true;
+    });
+  }
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+  try {
+    final url = "${Config.baseUrl}/api/chat/rooms/$currentUserId";
+    print('채팅방 조회 URL = $url');
 
-        final rooms = data.map((json) => ChatRoom.fromJson(json)).toList();
+    final response = await http.get(Uri.parse(url));
 
-        rooms.sort((a, b) {
-          if (a.isPinned != b.isPinned) {
-            return a.isPinned ? -1 : 1;
-          }
+    print('응답 상태코드 = ${response.statusCode}');
+    print('응답 headers = ${response.headers}');
+    print('응답 body = ${response.body}');
 
-          final aTime = DateTime.tryParse(a.lastMessageTime ?? '');
-          final bTime = DateTime.tryParse(b.lastMessageTime ?? '');
-
-          if (aTime == null && bTime == null) return 0;
-          if (aTime == null) return 1;
-          if (bTime == null) return -1;
-
-          return bTime.compareTo(aTime);
-        });
-
-        if (!mounted) return;
-
-        setState(() {
-          chatRooms = rooms;
-          isLoading = false;
-        });
-      } else {
-        if (!mounted) return;
-        setState(() {
-          isLoading = false;
-        });
-      }
-    } catch (e) {
-      debugPrint('fetchChatRooms error: $e');
+    if (response.statusCode != 200) {
       if (!mounted) return;
       setState(() {
         isLoading = false;
       });
+      return;
     }
+
+    final contentType = response.headers['content-type'] ?? '';
+    if (!contentType.contains('application/json')) {
+      print('JSON 아님! content-type = $contentType');
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+      return;
+    }
+
+    final List data = jsonDecode(response.body);
+    final rooms = data.map((json) => ChatRoom.fromJson(json)).toList();
+
+    rooms.sort((a, b) {
+      if (a.isPinned != b.isPinned) {
+        return a.isPinned ? -1 : 1;
+      }
+
+      final aTime = DateTime.tryParse(a.lastMessageTime ?? '');
+      final bTime = DateTime.tryParse(b.lastMessageTime ?? '');
+
+      if (aTime == null && bTime == null) return 0;
+      if (aTime == null) return 1;
+      if (bTime == null) return -1;
+
+      return bTime.compareTo(aTime);
+    });
+
+    if (!mounted) return;
+
+    setState(() {
+      chatRooms = rooms;
+      isLoading = false;
+    });
+  } catch (e) {
+    debugPrint('fetchChatRooms error: $e');
+    if (!mounted) return;
+    setState(() {
+      isLoading = false;
+    });
   }
+}
 
   Future<void> leaveRoom(int roomId) async {
+    if (currentUserId == null) return;
+
     await http.delete(
-      Uri.parse("$kBaseUrl/api/chat/rooms/$roomId?userId=$kCurrentUserId"),
+      Uri.parse("$Config.baseUrl/api/chat/rooms/$roomId?userId=$currentUserId"),
     );
     await fetchChatRooms(showLoading: false);
   }
 
   Future<void> markRoomAsRead(int roomId) async {
+    if (currentUserId == null) return;
+
     await http.post(
-      Uri.parse("$kBaseUrl/api/chat/read"),
+      Uri.parse("$Config.baseUrl/api/chat/read"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "roomId": roomId,
-        "userId": kCurrentUserId,
+        "userId": currentUserId,
       }),
     );
     await fetchChatRooms(showLoading: false);
   }
 
   Future<void> togglePin(ChatRoom room) async {
+    if (currentUserId == null) return;
+
     await http.patch(
-      Uri.parse("$kBaseUrl/api/chat/rooms/${room.roomId}/pin"),
+      Uri.parse("$Config.baseUrl/api/chat/rooms/${room.roomId}/pin"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
-        "userId": kCurrentUserId,
+        "userId": currentUserId,
         "isPinned": !room.isPinned,
       }),
     );
@@ -211,6 +259,20 @@ class _ChatListScreenState extends State<ChatListScreen> {
         ? chatRooms.where((room) => room.unreadCount > 0).toList()
         : chatRooms;
 
+    if (isLoading) {
+      return const Scaffold(
+        body: Center(child: CircularProgressIndicator()),
+      );
+    }
+
+    if (currentUserId == null) {
+      return const Scaffold(
+        body: Center(
+          child: Text('로그인 사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.'),
+        ),
+      );
+    }
+
     return Scaffold(
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFF78D),
@@ -225,123 +287,123 @@ class _ChatListScreenState extends State<ChatListScreen> {
           ),
         ),
       ),
-      body: isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
-              onRefresh: () => fetchChatRooms(showLoading: false),
-              child: filteredRooms.isEmpty
-                  ? ListView(
+      body: RefreshIndicator(
+        onRefresh: () => fetchChatRooms(showLoading: false),
+        child: filteredRooms.isEmpty
+            ? ListView(
+                children: [
+                  const SizedBox(height: 14),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
                       children: [
-                        const SizedBox(height: 14),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              FilterChip(
-                                label: const Text('안 읽음'),
-                                selected: showUnreadOnly,
-                                selectedColor: const Color(0xFFFFF78D),
-                                checkmarkColor: Colors.black87,
-                                side: BorderSide(
-                                  color: showUnreadOnly
-                                      ? const Color(0xFFE6D95B)
-                                      : Colors.grey.shade300,
-                                ),
-                                labelStyle: const TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                onSelected: (value) {
-                                  setState(() {
-                                    showUnreadOnly = value;
-                                  });
-                                },
-                              ),
-                            ],
+                        FilterChip(
+                          label: const Text('안 읽음'),
+                          selected: showUnreadOnly,
+                          selectedColor: const Color(0xFFFFF78D),
+                          checkmarkColor: Colors.black87,
+                          side: BorderSide(
+                            color: showUnreadOnly
+                                ? const Color(0xFFE6D95B)
+                                : Colors.grey.shade300,
                           ),
-                        ),
-                        const SizedBox(height: 180),
-                        Center(
-                          child: Text(
-                            showUnreadOnly
-                                ? "안 읽은 채팅이 없습니다."
-                                : "채팅방이 없습니다.",
-                            style: const TextStyle(fontSize: 16),
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
                           ),
-                        ),
-                      ],
-                    )
-                  : ListView(
-                      children: [
-                        const SizedBox(height: 10),
-                        Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          child: Row(
-                            children: [
-                              FilterChip(
-                                label: const Text('안 읽음'),
-                                selected: showUnreadOnly,
-                                selectedColor: const Color(0xFFFFF78D),
-                                checkmarkColor: Colors.black87,
-                                side: BorderSide(
-                                  color: showUnreadOnly
-                                      ? const Color(0xFFE6D95B)
-                                      : Colors.grey.shade300,
-                                ),
-                                labelStyle: const TextStyle(
-                                  color: Colors.black87,
-                                  fontWeight: FontWeight.w600,
-                                ),
-                                onSelected: (value) {
-                                  setState(() {
-                                    showUnreadOnly = value;
-                                  });
-                                },
-                              ),
-                            ],
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        ...filteredRooms.map(
-                          (room) => Dismissible(
-                            key: ValueKey('room_${room.roomId}'),
-                            direction: DismissDirection.endToStart,
-                            confirmDismiss: (_) async {
-                              await showRoomOptions(room);
-                              return false;
-                            },
-                            background: Container(
-                              alignment: Alignment.centerRight,
-                              padding:
-                                  const EdgeInsets.symmetric(horizontal: 20),
-                              color: Colors.grey.shade200,
-                              child: const Row(
-                                mainAxisAlignment: MainAxisAlignment.end,
-                                children: [
-                                  Icon(Icons.more_horiz),
-                                  SizedBox(width: 6),
-                                  Text('옵션'),
-                                ],
-                              ),
-                            ),
-                            child: ChatTile(
-                              room: room,
-                              onTap: () async {
-                                await Navigator.push(
-                                  context,
-                                  MaterialPageRoute(
-                                    builder: (_) => ChatRoomScreen(room: room),
-                                  ),
-                                );
-                                fetchChatRooms(showLoading: false);
-                              },
-                              onLongPress: () => showRoomOptions(room),
-                            ),
-                          ),
+                          onSelected: (value) {
+                            setState(() {
+                              showUnreadOnly = value;
+                            });
+                          },
                         ),
                       ],
                     ),
-            ),
+                  ),
+                  const SizedBox(height: 180),
+                  Center(
+                    child: Text(
+                      showUnreadOnly
+                          ? "안 읽은 채팅이 없습니다."
+                          : "채팅방이 없습니다.",
+                      style: const TextStyle(fontSize: 16),
+                    ),
+                  ),
+                ],
+              )
+            : ListView(
+                children: [
+                  const SizedBox(height: 10),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 16),
+                    child: Row(
+                      children: [
+                        FilterChip(
+                          label: const Text('안 읽음'),
+                          selected: showUnreadOnly,
+                          selectedColor: const Color(0xFFFFF78D),
+                          checkmarkColor: Colors.black87,
+                          side: BorderSide(
+                            color: showUnreadOnly
+                                ? const Color(0xFFE6D95B)
+                                : Colors.grey.shade300,
+                          ),
+                          labelStyle: const TextStyle(
+                            color: Colors.black87,
+                            fontWeight: FontWeight.w600,
+                          ),
+                          onSelected: (value) {
+                            setState(() {
+                              showUnreadOnly = value;
+                            });
+                          },
+                        ),
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                  ...filteredRooms.map(
+                    (room) => Dismissible(
+                      key: ValueKey('room_${room.roomId}'),
+                      direction: DismissDirection.endToStart,
+                      confirmDismiss: (_) async {
+                        await showRoomOptions(room);
+                        return false;
+                      },
+                      background: Container(
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.symmetric(horizontal: 20),
+                        color: Colors.grey.shade200,
+                        child: const Row(
+                          mainAxisAlignment: MainAxisAlignment.end,
+                          children: [
+                            Icon(Icons.more_horiz),
+                            SizedBox(width: 6),
+                            Text('옵션'),
+                          ],
+                        ),
+                      ),
+                      child: ChatTile(
+                        room: room,
+                        onTap: () async {
+                          await Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (_) => ChatRoomScreen(
+                                room: room,
+                                currentUserId: currentUserId!,
+                              ),
+                            ),
+                          );
+                          fetchChatRooms(showLoading: false);
+                        },
+                        onLongPress: () => showRoomOptions(room),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+      ),
     );
   }
 }
