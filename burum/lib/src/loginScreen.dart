@@ -188,15 +188,17 @@ class _LoginScreenState extends State<LoginScreen> {
         },
       );
       // 다은 작업 ** 채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
-        final userId =
-          responseData['userId'] ??
-          responseData['id'] ??
-         (responseData['user'] != null ? responseData['user']['id'] : null);
+      final userId =
+          response.data['userId'] ??
+          response.data['id'] ??
+          (response.data['user'] != null ? response.data['user']['id'] : null);
 
-        if (userId != null) {
-         await storage.write(key: 'userId', value: userId.toString());
-        }
-        //여기까징
+      print("이거 잘 뜨나요 $userId");
+
+      if (userId != null) {
+        await storage.write(key: 'userId', value: userId.toString());
+      }
+      //여기까징
       await _handleLoginSuccess(response.data);
     } on DioException catch (err) {
       print('백엔드 통신 에러: $err');
@@ -232,16 +234,16 @@ class _LoginScreenState extends State<LoginScreen> {
       await storage.write(key: 'nickname', value: nickname);
     }
 
-  // 다은 작업 **채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
-  final userId =
-      responseData['userId'] ??
-      responseData['id'] ??
-      (responseData['user'] != null ? responseData['user']['id'] : null);
+    // 다은 작업 **채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
+    final userId =
+        responseData['userId'] ??
+        responseData['id'] ??
+        (responseData['user'] != null ? responseData['user']['id'] : null);
 
-  if (userId != null) {
-    await storage.write(key: 'userId', value: userId.toString());
-  }
-  // 여기까징 
+    if (userId != null) {
+      await storage.write(key: 'userId', value: userId.toString());
+    }
+    // 여기까징
 
     if (!mounted) return;
 
