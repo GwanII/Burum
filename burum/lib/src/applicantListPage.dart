@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart';
 import '../config.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
@@ -13,7 +12,6 @@ class Applicant {
   final String timeAgo;
   final String specialty;
   final String introduction;
-  // 🌟 [다중 선택 변경점 1] 백엔드에서 내려주는 status 값을 받을 변수 추가!
   final String status;
 
   Applicant({
@@ -24,7 +22,7 @@ class Applicant {
     required this.timeAgo,
     required this.specialty,
     required this.introduction,
-    required this.status, // 추가됨
+    required this.status,
   });
 
   factory Applicant.fromJson(Map<String, dynamic> json) {
@@ -36,7 +34,6 @@ class Applicant {
       timeAgo: '최근', // TODO: 시간 계산 로직
       specialty: json['user_title'] ?? '타이틀 없음',
       introduction: json['apply_message'] ?? '지원 메시지가 없습니다.',
-      // 🌟 JSON에서 status 값을 파싱합니다. 없으면 기본값 'PENDING'
       status: json['status'] ?? 'PENDING',
     );
   }
@@ -52,12 +49,16 @@ class ApplicantListPage extends StatefulWidget {
 }
 
 class _ApplicantListPageState extends State<ApplicantListPage> {
-  List<Applicant> applicants = [];
+  List<Applicant> applicants = []; // 전체 지원자 (숨겨지지 않은)
+  List<Applicant> hiddenApplicants = []; // 🌟 숨겨진 지원자들 보관함
   List<bool> _isExpandedList = [];
-  bool isLoading = true;
+  List<bool> _isHiddenExpandedList = []; // 가린 사람들 전용 확장 상태
 
-  // 🌟 [다중 선택 변경점 2] 한 명만 기억하던 변수를 '바구니(List)'로 변경!
+  bool isLoading = true;
+  bool isShowingHiddenOnly = false; // 🌟 현재 가린 사람만 보고 있는지 여부
+
   List<int> selectedApplicantIds = [];
+  final Dio dio = Dio();
 
   @override
   void initState() {
@@ -67,19 +68,18 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
 
   Future<void> _fetchApplicants() async {
     try {
-      final url = Uri.parse(
-        '${Config.baseUrl}/api/posts/${widget.postId}/applicants',
-      );
-      final response = await http.get(url);
+      final url = '${Config.baseUrl}/api/posts/${widget.postId}/applicants';
+      final response = await dio.get(url);
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = json.decode(response.body);
+        final List<dynamic> data = response.data;
 
         setState(() {
           applicants = data.map((json) => Applicant.fromJson(json)).toList();
           _isExpandedList = List.generate(applicants.length, (index) => true);
+          hiddenApplicants = [];
+          _isHiddenExpandedList = [];
 
-          // 🌟 [다중 선택 변경점 3] 서버에서 받아온 사람 중 상태가 'ACCEPTED'인 사람만 바구니에 쏙쏙 담습니다!
           selectedApplicantIds.clear();
           for (var applicant in applicants) {
             if (applicant.status == 'ACCEPTED') {
@@ -99,6 +99,39 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
     }
   }
 
+  // 🌟 지원자 숨기기 함수
+  void _hideApplicant(int index) {
+    setState(() {
+      final target = applicants.removeAt(index);
+      _isExpandedList.removeAt(index);
+      hiddenApplicants.add(target);
+      _isHiddenExpandedList.add(true);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('지원자를 가렸습니다.'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  // 🌟 가린 지원자 다시 보이기 함수
+  void _unhideApplicant(int index) {
+    setState(() {
+      final target = hiddenApplicants.removeAt(index);
+      _isHiddenExpandedList.removeAt(index);
+      applicants.add(target);
+      _isExpandedList.add(true);
+    });
+    ScaffoldMessenger.of(context).showSnackBar(
+      const SnackBar(
+        content: Text('지원자를 다시 리스트에 표시합니다.'),
+        duration: Duration(seconds: 1),
+      ),
+    );
+  }
+
+  // 🌟 선택하기 (수락) 로직
   Future<void> _assignApplicant(int applicantId, String applicantName) async {
     bool confirm =
         await showDialog(
@@ -113,7 +146,10 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('확인'),
+                child: const Text(
+                  '확인',
+                  style: TextStyle(fontWeight: FontWeight.bold),
+                ),
               ),
             ],
           ),
@@ -127,307 +163,493 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
         await storage.read(key: 'accessToken') ??
         await storage.read(key: 'FlutterSecureStorage.accessToken');
 
-    if (token == null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('로그인 정보가 없습니다. 다시 로그인 해주세요.')),
-      );
-      return;
-    }
-
     try {
-      final url = Uri.parse(
+      final response = await dio.put(
         '${Config.baseUrl}/api/createErrand/${widget.postId}/assign',
+        options: Options(headers: {'Authorization': 'Bearer $token'}),
+        data: {'userId': applicantId},
       );
-
-      final response = await http.put(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        body: jsonEncode({'userId': applicantId}),
-      );
-
       if (response.statusCode == 200 || response.statusCode == 201) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('🎉 $applicantName님이 선택되었습니다!')),
           );
-          setState(() {
-            // 🌟 [다중 선택 변경점 4] 선택된 사람을 바구니에 '추가(add)' 합니다!
-            selectedApplicantIds.add(applicantId);
-          });
+          setState(() => selectedApplicantIds.add(applicantId));
         }
-      } else {
-        print("선택 실패: ${response.statusCode}");
       }
     } catch (e) {
-      print("통신 에러: $e");
+      print(e);
     }
   }
 
+  // 🌟 선택 취소하기 (이중 경고 팝업 완벽 복구!)
   Future<void> _cancelApplicant(int applicantId, String applicantName) async {
-    const storage = FlutterSecureStorage();
-    final token =
-        await storage.read(key: 'accessToken') ??
-        await storage.read(key: 'FlutterSecureStorage.accessToken');
+    String? selectedReason;
+    final List<String> reasons = [
+      '사용자가 연락을 받지 않음',
+      '심부름 수행이 불가능한 환경',
+      '부적절한 심부름 내용',
+      '단순 변심 및 기타',
+    ];
 
-    try {
-      // 💡 이 부분은 백엔드에 만들어둔 '선택 취소' API 주소에 맞게 확인해 주세요!
-      final url = Uri.parse(
-        '${Config.baseUrl}/api/createErrand/${widget.postId}/cancelAssign',
-      );
+    // 1단계: 사유 선택 팝업
+    final bool? shouldCancel = await showDialog<bool>(
+      context: context,
+      builder: (BuildContext dialogContext) {
+        return StatefulBuilder(
+          builder: (BuildContext stateContext, StateSetter setDialogState) {
+            return AlertDialog(
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              title: const Text(
+                '선택 취소 사유',
+                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+              ),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: reasons.map((reason) {
+                    return RadioListTile<String>(
+                      title: Text(reason, style: const TextStyle(fontSize: 15)),
+                      value: reason,
+                      groupValue: selectedReason,
+                      activeColor: Colors.redAccent,
+                      contentPadding: EdgeInsets.zero,
+                      onChanged: (String? value) {
+                        setDialogState(() {
+                          selectedReason = value;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(dialogContext, false),
+                  child: const Text('닫기', style: TextStyle(color: Colors.grey)),
+                ),
+                TextButton(
+                  onPressed: () {
+                    if (selectedReason != null) {
+                      Navigator.pop(dialogContext, true);
+                    } else {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('취소 사유를 선택해주세요.')),
+                      );
+                    }
+                  },
+                  child: const Text(
+                    '다음',
+                    style: TextStyle(
+                      color: Colors.black87,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
 
-      final response = await http.put(
-        url,
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-        // 취소할 유저 아이디도 백엔드에 보내줘야 할 수 있으니 바디를 추가합니다.
-        body: jsonEncode({'userId': applicantId}),
-      );
-
-      if (response.statusCode == 200) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('❌ $applicantName님 선택이 취소되었습니다.')),
+    // 2단계: 최종 경고 팝업
+    if (shouldCancel == true) {
+      final bool? finalConfirm = await showDialog<bool>(
+        context: context,
+        builder: (BuildContext confirmContext) {
+          return AlertDialog(
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            title: const Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.orange),
+                SizedBox(width: 8),
+                Text(
+                  '선택 취소 경고',
+                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 18),
+                ),
+              ],
+            ),
+            content: Text(
+              '$applicantName님에게 취소 알림이 전송됩니다.\n정말 선택을 취소하시겠습니까?\n\n※ 잦은 취소는 서비스 이용에 불이익이 있을 수 있으니 신중하게 결정해 주세요.',
+              style: const TextStyle(
+                fontSize: 14,
+                height: 1.5,
+                color: Colors.black87,
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(confirmContext, false),
+                child: const Text('돌아가기', style: TextStyle(color: Colors.grey)),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(confirmContext, true),
+                child: const Text(
+                  '최종 취소하기',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
           );
-          setState(() {
-            // 🌟 [다중 선택 변경점 5] 선택 취소된 사람을 바구니에서 '제거(remove)' 합니다!
-            selectedApplicantIds.remove(applicantId);
-          });
+        },
+      );
+
+      // 3단계: 확인 시 Dio 통신 진행
+      if (finalConfirm == true) {
+        const storage = FlutterSecureStorage();
+        final token =
+            await storage.read(key: 'accessToken') ??
+            await storage.read(key: 'FlutterSecureStorage.accessToken');
+
+        try {
+          final url =
+              '${Config.baseUrl}/api/createErrand/${widget.postId}/cancelAssign';
+          final response = await dio.put(
+            url,
+            options: Options(
+              headers: {
+                'Content-Type': 'application/json',
+                'Authorization': 'Bearer $token',
+              },
+            ),
+            data: {'userId': applicantId, 'reason': selectedReason},
+          );
+
+          if (response.statusCode == 200) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('❌ $applicantName님 선택이 취소되었습니다.')),
+              );
+              setState(() => selectedApplicantIds.remove(applicantId));
+            }
+          } else {
+            print("취소 실패: ${response.statusCode}");
+          }
+        } catch (e) {
+          print("통신 에러: $e");
         }
       }
-    } catch (e) {
-      print("통신 에러: $e");
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // 🌟 현재 모드에 따라 보여줄 리스트를 결정합니다.
+    final currentList = isShowingHiddenOnly ? hiddenApplicants : applicants;
+    final currentExpandedList = isShowingHiddenOnly
+        ? _isHiddenExpandedList
+        : _isExpandedList;
+
     return Scaffold(
       backgroundColor: const Color(0xFFF5F5F5),
       appBar: AppBar(
         backgroundColor: const Color(0xFFFFF799),
         elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back, color: Colors.black),
-          onPressed: () => Navigator.of(context).pop(),
-        ),
-        title: const Text(
-          '지원자 목록',
-          style: TextStyle(
+        title: Text(
+          isShowingHiddenOnly ? '가린 지원자' : '지원자 목록',
+          style: const TextStyle(
             color: Colors.black,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
         ),
         centerTitle: true,
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.black),
+          onPressed: () => Navigator.of(context).pop(),
+        ),
       ),
       body: isLoading
           ? const Center(child: CircularProgressIndicator())
-          : applicants.isEmpty
-          ? const Center(child: Text('아직 지원자가 없습니다.'))
-          : ListView.builder(
-              padding: const EdgeInsets.all(16.0),
-              itemCount: applicants.length,
-              itemBuilder: (context, index) {
-                final applicant = applicants[index];
-                final isExpanded = _isExpandedList[index];
-
-                // 🌟 [다중 선택 변경점 6] 이 유저의 ID가 바구니(List) 안에 들어있는지 확인!
-                final isSelected = selectedApplicantIds.contains(
-                  applicant.userId,
-                );
-
-                return Container(
-                  margin: const EdgeInsets.only(bottom: 16.0),
-                  padding: const EdgeInsets.all(16.0),
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(16.0),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.05),
-                        spreadRadius: 1,
-                        blurRadius: 5,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
+          : Column(
+              children: [
+                // 🌟 상단 눈 모양 필터 버튼
+                Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16.0,
+                    vertical: 8.0,
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.end,
                     children: [
-                      Row(
-                        crossAxisAlignment: CrossAxisAlignment.center,
-                        children: [
-                          CircleAvatar(
-                            radius: 28,
-                            backgroundColor: Colors.grey[200],
-                            backgroundImage: NetworkImage(
-                              applicant.profileImageUrl,
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  applicant.name,
-                                  style: const TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                const SizedBox(height: 2),
-                                Text(
-                                  applicant.specialty,
-                                  style: const TextStyle(
-                                    fontSize: 14,
-                                    color: Colors.black54,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                          const SizedBox(width: 8),
-                          Column(
-                            crossAxisAlignment: CrossAxisAlignment.end,
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                applicant.level,
-                                style: const TextStyle(
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                  color: Color(0xFF5C6BC0),
-                                ),
-                              ),
-                              Text(
-                                applicant.timeAgo,
-                                style: const TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(width: 8),
-                          Row(
-                            children: [
-                              const Icon(
-                                Icons.visibility_off_outlined,
-                                color: Colors.black54,
-                                size: 18,
-                              ),
-                              const SizedBox(width: 4),
-                              GestureDetector(
-                                onTap: () {
-                                  setState(() {
-                                    _isExpandedList[index] =
-                                        !_isExpandedList[index];
-                                  });
-                                },
-                                child: Icon(
-                                  isExpanded
-                                      ? Icons.keyboard_arrow_up
-                                      : Icons.keyboard_arrow_down,
-                                  color: Colors.black54,
-                                ),
-                              ),
-                            ],
-                          ),
-                        ],
-                      ),
-                      if (isExpanded) ...[
-                        const SizedBox(height: 16),
-                        const Divider(height: 1, color: Color(0xFFEEEEEE)),
-                        const SizedBox(height: 16),
-                        Text(
-                          applicant.introduction,
+                      TextButton.icon(
+                        onPressed: () {
+                          setState(() {
+                            isShowingHiddenOnly = !isShowingHiddenOnly;
+                          });
+                        },
+                        icon: Icon(
+                          isShowingHiddenOnly
+                              ? Icons.visibility
+                              : Icons.visibility_off_outlined,
+                          size: 18,
+                          color: Colors.black87,
+                        ),
+                        label: Text(
+                          isShowingHiddenOnly ? '전체 보기' : '가린 사람 보기',
                           style: const TextStyle(
-                            fontSize: 15,
-                            height: 1.5,
                             color: Colors.black87,
+                            fontWeight: FontWeight.w600,
                           ),
                         ),
-                        const SizedBox(height: 20),
-                        Row(
-                          children: [
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  print("${applicant.name}님과 채팅 시작!");
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: const Color(0xFFFFF9C4),
-                                  foregroundColor: Colors.black,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24.0),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                                child: const Text(
-                                  '채팅하기',
-                                  style: TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 12),
-                            Expanded(
-                              child: ElevatedButton(
-                                onPressed: () {
-                                  if (isSelected) {
-                                    _cancelApplicant(
-                                      applicant.userId,
-                                      applicant.name,
-                                    );
-                                  } else {
-                                    _assignApplicant(
-                                      applicant.userId,
-                                      applicant.name,
-                                    );
-                                  }
-                                },
-                                style: ElevatedButton.styleFrom(
-                                  backgroundColor: isSelected
-                                      ? Colors.grey[300]
-                                      : const Color(0xFFFFF9C4),
-                                  foregroundColor: isSelected
-                                      ? Colors.black54
-                                      : Colors.black,
-                                  elevation: 0,
-                                  shape: RoundedRectangleBorder(
-                                    borderRadius: BorderRadius.circular(24.0),
-                                  ),
-                                  padding: const EdgeInsets.symmetric(
-                                    vertical: 14,
-                                  ),
-                                ),
-                                child: Text(
-                                  isSelected ? '선택취소하기' : '선택하기',
-                                  style: const TextStyle(
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
+                        style: TextButton.styleFrom(
+                          backgroundColor: Colors.white,
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
                         ),
-                      ],
+                      ),
                     ],
                   ),
-                );
-              },
+                ),
+                // 🌟 리스트 영역
+                Expanded(
+                  child: currentList.isEmpty
+                      ? Center(
+                          child: Text(
+                            isShowingHiddenOnly
+                                ? '가린 지원자가 없습니다.'
+                                : '아직 지원자가 없습니다.',
+                          ),
+                        )
+                      : ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16.0),
+                          itemCount: currentList.length,
+                          itemBuilder: (context, index) {
+                            final applicant = currentList[index];
+                            final isExpanded = currentExpandedList[index];
+                            final isSelected = selectedApplicantIds.contains(
+                              applicant.userId,
+                            );
+
+                            return Container(
+                              margin: const EdgeInsets.only(bottom: 16.0),
+                              padding: const EdgeInsets.all(16.0),
+                              decoration: BoxDecoration(
+                                color: Colors.white,
+                                borderRadius: BorderRadius.circular(16.0),
+                                boxShadow: [
+                                  BoxShadow(
+                                    color: Colors.black.withOpacity(0.05),
+                                    blurRadius: 5,
+                                    offset: const Offset(0, 2),
+                                  ),
+                                ],
+                              ),
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Row(
+                                    crossAxisAlignment:
+                                        CrossAxisAlignment.center,
+                                    children: [
+                                      CircleAvatar(
+                                        radius: 28,
+                                        backgroundColor: Colors.grey[200],
+                                        backgroundImage: NetworkImage(
+                                          applicant.profileImageUrl,
+                                        ),
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Expanded(
+                                        child: Column(
+                                          crossAxisAlignment:
+                                              CrossAxisAlignment.start,
+                                          children: [
+                                            Text(
+                                              applicant.name,
+                                              style: const TextStyle(
+                                                fontSize: 18,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                            const SizedBox(height: 2),
+                                            Text(
+                                              applicant.specialty,
+                                              style: const TextStyle(
+                                                fontSize: 14,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                      Column(
+                                        crossAxisAlignment:
+                                            CrossAxisAlignment.end,
+                                        children: [
+                                          Text(
+                                            applicant.level,
+                                            style: const TextStyle(
+                                              fontSize: 18,
+                                              fontWeight: FontWeight.bold,
+                                              color: Color(0xFF5C6BC0),
+                                            ),
+                                          ),
+                                          Text(
+                                            applicant.timeAgo,
+                                            style: const TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.black54,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      const SizedBox(width: 12),
+                                      Row(
+                                        children: [
+                                          // 🌟 눈 아이콘 (숨기기 / 보이기)
+                                          GestureDetector(
+                                            onTap: () => isShowingHiddenOnly
+                                                ? _unhideApplicant(index)
+                                                : _hideApplicant(index),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(
+                                                4.0,
+                                              ),
+                                              child: Icon(
+                                                isShowingHiddenOnly
+                                                    ? Icons.visibility
+                                                    : Icons
+                                                          .visibility_off_outlined,
+                                                color: isShowingHiddenOnly
+                                                    ? Colors.blue
+                                                    : Colors.black45,
+                                                size: 20,
+                                              ),
+                                            ),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          GestureDetector(
+                                            onTap: () => setState(
+                                              () => currentExpandedList[index] =
+                                                  !isExpanded,
+                                            ),
+                                            child: Padding(
+                                              padding: const EdgeInsets.all(
+                                                4.0,
+                                              ),
+                                              child: Icon(
+                                                isExpanded
+                                                    ? Icons.keyboard_arrow_up
+                                                    : Icons.keyboard_arrow_down,
+                                                color: Colors.black54,
+                                              ),
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                    ],
+                                  ),
+                                  if (isExpanded) ...[
+                                    const SizedBox(height: 16),
+                                    const Divider(
+                                      height: 1,
+                                      color: Color(0xFFEEEEEE),
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      applicant.introduction,
+                                      style: const TextStyle(
+                                        fontSize: 15,
+                                        height: 1.5,
+                                        color: Colors.black87,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 20),
+                                    Row(
+                                      children: [
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              print(
+                                                "${applicant.name}님과 채팅 시작!",
+                                              );
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: const Color(
+                                                0xFFFFF9C4,
+                                              ),
+                                              foregroundColor: Colors.black,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(24.0),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 14,
+                                                  ),
+                                            ),
+                                            child: const Text(
+                                              '채팅하기',
+                                              style: TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                        const SizedBox(width: 12),
+                                        Expanded(
+                                          child: ElevatedButton(
+                                            onPressed: () {
+                                              if (isSelected) {
+                                                _cancelApplicant(
+                                                  applicant.userId,
+                                                  applicant.name,
+                                                );
+                                              } else {
+                                                _assignApplicant(
+                                                  applicant.userId,
+                                                  applicant.name,
+                                                );
+                                              }
+                                            },
+                                            style: ElevatedButton.styleFrom(
+                                              backgroundColor: isSelected
+                                                  ? Colors.grey[300]
+                                                  : const Color(0xFFFFF9C4),
+                                              foregroundColor: isSelected
+                                                  ? Colors.black54
+                                                  : Colors.black,
+                                              elevation: 0,
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(24.0),
+                                              ),
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    vertical: 14,
+                                                  ),
+                                            ),
+                                            child: Text(
+                                              isSelected ? '선택취소하기' : '선택하기',
+                                              style: const TextStyle(
+                                                fontSize: 16,
+                                                fontWeight: FontWeight.bold,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ],
+                                ],
+                              ),
+                            );
+                          },
+                        ),
+                ),
+              ],
             ),
     );
   }
