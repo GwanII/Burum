@@ -1,10 +1,8 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
-import 'dart:convert';
+import 'package:dio/dio.dart'; // 🌟 Dio 예외 처리를 위해 추가!
 import 'loginScreen.dart';
-import '../config.dart';
+import '../dio_client.dart'; // 🌟 우리의 전담 우체부 모셔오기!
 
 class MyPageScreen extends StatefulWidget {
   const MyPageScreen({Key? key}) : super(key: key);
@@ -25,45 +23,27 @@ class _MyPageScreenState extends State<MyPageScreen> {
     fetchProfile();
   }
 
+  // 🌟 심폐소생술 1: DioClient를 적용하여 확 짧아진 프로필 조회 함수!
   Future<void> fetchProfile() async {
-    // 1. 이미 확인하신 방식으로 토큰을 가져옵니다.
-    final token =
-        await storage.read(key: 'accessToken') ??
-        await storage.read(key: 'FlutterSecureStorage.accessToken');
+    try {
+      // 💡 토큰 꺼내서 헤더에 넣는 귀찮은 작업은 DioClient가 알아서 해줍니다!
+      // BaseUrl도 DioClient 안에 설정되어 있을 테니 뒷부분(경로)만 적어주면 됩니다.
+      final response = await DioClient.instance.get('/api/posts/profile');
 
-    if (token == null) {
       setState(() {
-        nickname = "로그인 필요";
+        // 백엔드에서 어떻게 주느냐에 따라 맞춰서 꺼내 쓰세요!
+        nickname = response.data['nickname'] ?? "닉네임 없음";
         isLoading = false;
       });
-      return;
-    }
-
-    try {
-      // 2. 크롬이므로 localhost:3000 사용
-      final response = await http.get(
-        Uri.parse('http://localhost:3000/api/posts/profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          // 백엔드에서 res.json({ nickname: results[0].nickname }) 으로 보내준다고 가정
-          nickname = data['nickname'] ?? "닉네임 없음";
-          isLoading = false;
-        });
-      } else {
-        // 서버 터미널에 에러 로그가 찍힐 겁니다.
-        print("서버 응답 에러: ${response.statusCode}");
-        setState(() {
-          nickname = "인증 오류(${response.statusCode})";
-          isLoading = false;
-        });
-      }
+    } on DioException catch (e) {
+      // 서버 터미널 대신 앱 콘솔에 예쁘게 에러를 찍어줍니다.
+      print("서버 응답 에러: ${e.response?.statusCode} - ${e.message}");
+      setState(() {
+        nickname = e.response?.statusCode == 401
+            ? "로그인 필요"
+            : "인증 오류(${e.response?.statusCode})";
+        isLoading = false;
+      });
     } catch (e) {
       print("통신 에러: $e");
       setState(() {
@@ -73,30 +53,21 @@ class _MyPageScreenState extends State<MyPageScreen> {
     }
   }
 
-  // 로그아웃 처리 함수
+  // 🌟 심폐소생술 2: 로그아웃 함수도 간결하게!
   Future<void> _logout() async {
-    // 1. 기기에 저장된 액세스 토큰 읽어오기
-    final accessToken = await storage.read(key: 'accessToken');
-
-    // 2. 백엔드에 로그아웃 요청 (DB에서 refreshToken 삭제)
-    if (accessToken != null) {
-      try {
-        final url = Uri.parse('${Config.baseUrl}/api/users/logout');
-        await http.post(
-          url,
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': 'Bearer $accessToken',
-          },
-        );
-      } catch (e) {
-        print('백엔드 로그아웃 통신 에러: $e');
-      }
+    try {
+      // 백엔드에 로그아웃 요청 (이것도 DioClient가 토큰 챙겨서 갑니다)
+      await DioClient.instance.post('/api/users/logout');
+    } catch (e) {
+      print('백엔드 로그아웃 통신 에러 (이미 만료되었거나 서버 문제): $e');
+      // 백엔드 통신에 실패하더라도, 앱 내 로그아웃은 진행해야 하므로 멈추지 않습니다!
     }
 
-    // 3. 기기에 저장된 모든 토큰 삭제
-    await storage.deleteAll(); // 저장된 모든 토큰 삭제
+    // 기기에 저장된 모든 토큰 삭제
+    await storage.deleteAll();
+
     if (!mounted) return;
+
     // 로그인 화면으로 이동하며 기존 화면 스택(히스토리)을 모두 지움
     Navigator.pushAndRemoveUntil(
       context,
