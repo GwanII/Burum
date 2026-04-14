@@ -4,6 +4,7 @@ import 'homeScreen.dart';
 import 'myPageScreen.dart';
 import '../screens/chat_list_screen.dart';
 import 'calendarScreen.dart';
+import 'package:burum/screens/errand_management_screen.dart';
 
 // ㅁㄴㅇㄻㄴㅇㄻㄴㅇㄹㄴㅁㅇㅁㄹㄴㅇㄹ
 class MainScreen extends StatefulWidget {
@@ -22,7 +23,7 @@ class _MainScreenState extends State<MainScreen> {
   final List<Widget> _screens = [
     const HomeScreen(),
     ChatListScreen(),
-    const CreateErrandsPage(), // 2번 탭 (임시)
+    const ErrandManagementScreen(), // 2번 탭 (임시)
 //    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
     const CalendarScreen(), // 3번 탭 (임시)
     const MyPageScreen(), // 4번 탭 (마이페이지)
