@@ -1,12 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:table_calendar/table_calendar.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
-import 'package:flutter/foundation.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
-// 🌟🌟🌟 [궁극의 주소 압축 마법 수입!!!!!] 🌟🌟🌟
 import '../config.dart'; 
+import '../dio_client.dart';
 
 class EventDateRange {
   DateTime start;
@@ -15,7 +14,6 @@ class EventDateRange {
 }
 
 class CalendarEvent {
-  // 🌟🌟🌟 [핵심 1: 백엔드가 지어준 고유 번호표(id) 주머니 추가!!!!!] 🌟🌟🌟
   final int? id; 
   final String title;
   final String content; 
@@ -24,7 +22,6 @@ class CalendarEvent {
   final int alarmMinutes;
   final List<EventDateRange> dateRanges;
 
-  // 💡 이름표(Named Parameters) 방식으로 깔끔하게 개조했소!
   CalendarEvent({
     this.id, 
     required this.title, 
@@ -45,7 +42,6 @@ class CalendarScreen extends StatefulWidget {
 
 class _CalendarScreenState extends State<CalendarScreen> {
   final Color mainYellow = const Color(0xFFFFF59D);
-  final storage = const FlutterSecureStorage(); 
   
   DateTime _focusedDay = DateTime.now();
   DateTime? _selectedDay;
@@ -59,22 +55,11 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _fetchEventsFromDatabase() async {
-    String? myAccessToken = await storage.read(key: 'accessToken');
-    if (myAccessToken == null) return; 
-
-    final url = Uri.parse('${Config.baseUrl}/api/calendar'); 
-
     try {
-      final response = await http.get(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $myAccessToken"
-        },
-      );
+      final response = await DioClient.instance.get('${Config.baseUrl}/api/calendar');
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = response.data; 
         if (data['success'] == true) {
           final List<dynamic> fetchedEvents = data['events'];
           
@@ -101,7 +86,7 @@ class _CalendarScreenState extends State<CalendarScreen> {
                 else if (e['alarm'] == '60') alarmMin = 60;
 
                 final newEvent = CalendarEvent(
-                  id: e['id'], // 💡 DB 창고에서 진짜 번호표를 가져오오!
+                  id: e['id'], 
                   title: e['title'], 
                   content: e['content'] ?? '', 
                   color: eventColor, 
@@ -136,11 +121,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   Future<void> _saveEventToDatabase(CalendarEvent newEvent) async {
-    String? myAccessToken = await storage.read(key: 'accessToken');
-    if (myAccessToken == null) return;
-
-    final url = Uri.parse('${Config.baseUrl}/api/calendar'); 
-
     List<Map<String, String>> dateRangesJson = newEvent.dateRanges.map((range) {
       return {
         "start": "${range.start.year}-${range.start.month.toString().padLeft(2, '0')}-${range.start.day.toString().padLeft(2, '0')} ${range.start.hour.toString().padLeft(2, '0')}:${range.start.minute.toString().padLeft(2, '0')}:00",
@@ -158,17 +138,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
     };
 
     try {
-      final response = await http.post(
-        url, 
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $myAccessToken" 
-        }, 
-        body: jsonEncode(requestData),
+      final response = await DioClient.instance.post(
+        '${Config.baseUrl}/api/calendar', 
+        data: requestData,
       );
 
       if (response.statusCode == 201) {
-        // 등록 성공 후 전체 일정을 다시 불러와서 방금 등록한 일정의 진짜 ID를 확보하오!
         await _fetchEventsFromDatabase();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('서버 창고에 일정이 무사히 저장되었소!!!!!')));
@@ -179,16 +154,10 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
   }
 
-  // 🚀 [삭제 대포 마법!!!!!]
   Future<void> _deleteEvents(List<CalendarEvent> eventsToDelete, DateTime day) async {
-    String? myAccessToken = await storage.read(key: 'accessToken');
-    if (myAccessToken == null) return;
-
-    // 지울 일정들의 번호표(id)만 쏙쏙 뽑아내오!
     List<int> idsToDelete = eventsToDelete.where((e) => e.id != null).map((e) => e.id!).toList();
 
     if (idsToDelete.isEmpty) {
-      // 만약 DB에서 가져오지 않은 방금 만든 일정이라면 프론트에서만 지우오!
       setState(() {
         for (var event in eventsToDelete) {
           final normalizedDay = DateTime(day.year, day.month, day.day);
@@ -199,22 +168,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
     }
 
     try {
-      // 🚨 TODO: 용사님! 나중에 백엔드에 'DELETE /api/calendar' 길목을 뚫어두어야 하오!!!!!
-      // 백엔드는 이 ids 배열을 받아서 DB에서 날려버려야 하오!
-      final url = Uri.parse('${Config.baseUrl}/api/calendar'); 
       final requestData = { "ids": idsToDelete };
 
-      final response = await http.delete(
-        url,
-        headers: {
-          "Content-Type": "application/json",
-          "Authorization": "Bearer $myAccessToken"
-        },
-        body: jsonEncode(requestData),
+      final response = await DioClient.instance.delete(
+        '${Config.baseUrl}/api/calendar',
+        data: requestData,
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 통신이 성공하면 프론트 화면(달력)에서도 지워주오!
         setState(() {
           for (var event in eventsToDelete) {
             final normalizedDay = DateTime(day.year, day.month, day.day);
@@ -244,15 +205,14 @@ class _CalendarScreenState extends State<CalendarScreen> {
   }
 
   void _showDailyEventsSheet(DateTime day) {
-    bool isDeleteMode = false; // 삭제 모드 스위치!
-    Set<CalendarEvent> selectedEvents = {}; // 삭제할 녀석들을 담아둘 바구니!
+    bool isDeleteMode = false; 
+    Set<CalendarEvent> selectedEvents = {}; 
 
     showModalBottomSheet(
       context: context,
       isScrollControlled: true, 
       backgroundColor: Colors.transparent, 
       builder: (context) {
-        // 🌟🌟🌟 [핵심 2: 바텀 시트 안에서만 화면을 갱신하는 전용 미니 캔버스!!!!!] 🌟🌟🌟
         return StatefulBuilder(
           builder: (BuildContext context, StateSetter setModalState) {
             final events = _getEventsForDay(day);
@@ -320,7 +280,6 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                                 ],
                                               ),
                                             ),
-                                            // 🌟🌟🌟 [체크박스 마법 발동!!!!!] 🌟🌟🌟
                                             if (isDeleteMode)
                                               Checkbox(
                                                 value: selectedEvents.contains(event),
@@ -340,17 +299,26 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     },
                                   ),
                           ),
-                          // 하단 여백 (버튼에 안 가려지게)
                           const SizedBox(height: 100),
                         ],
                       ),
                       
-                      // 🌟🌟🌟 [상황에 따라 변신하는 하단 버튼들!!!!!] 🌟🌟🌟
+                      // 🌟 터치 한 번에 탈출! 직관적인 닫기(X) 버튼 추가! 🌟
+                      Positioned(
+                        right: 12,
+                        top: 12,
+                        child: IconButton(
+                          icon: const Icon(Icons.close, color: Colors.black54, size: 28),
+                          onPressed: () {
+                            Navigator.pop(context); 
+                          },
+                        ),
+                      ),
+
                       Positioned(
                         right: 20,
                         bottom: 20,
                         child: isDeleteMode
-                            // [삭제 모드일 때: 취소 & N개 삭제 버튼]
                             ? Row(
                                 children: [
                                   FloatingActionButton.extended(
@@ -372,14 +340,13 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     backgroundColor: Colors.redAccent,
                                     onPressed: selectedEvents.isEmpty ? null : () {
                                       _deleteEvents(selectedEvents.toList(), day);
-                                      Navigator.pop(context); // 삭제 후 시트 닫기!
+                                      Navigator.pop(context); 
                                     },
                                     label: Text('${selectedEvents.length}개 삭제', style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold)),
                                     icon: const Icon(Icons.delete, color: Colors.white),
                                   ),
                                 ],
                               )
-                            // [기본 모드일 때: 일반 삭제 버튼]
                             : SizedBox(
                                 width: 70, height: 70,
                                 child: FloatingActionButton(
@@ -391,9 +358,9 @@ class _CalendarScreenState extends State<CalendarScreen> {
                                     side: BorderSide(color: Colors.grey.shade400, width: 1),
                                   ),
                                   onPressed: () {
-                                    if (events.isEmpty) return; // 일정이 없으면 안 눌리게!
+                                    if (events.isEmpty) return; 
                                     setModalState(() {
-                                      isDeleteMode = true; // 삭제 모드로 스위치 ON!
+                                      isDeleteMode = true; 
                                     });
                                   },
                                   child: const Column(
@@ -437,7 +404,12 @@ class _CalendarScreenState extends State<CalendarScreen> {
               lastDay: DateTime.utc(2030, 12, 31), 
               focusedDay: _focusedDay,
               startingDayOfWeek: StartingDayOfWeek.sunday,
-              rowHeight: 80, 
+              
+              // 🌟🌟🌟 요괴 퇴치 마법 1: 화면을 빈틈없이 꽉 채우게 하옵니다! (오버플로우 해결) 🌟🌟🌟
+              shouldFillViewport: true, 
+              
+              // 🌟🌟🌟 요괴 퇴치 마법 2: 어떤 달이든 6주(7x6) 사이즈로 튼튼하게 고정! 🌟🌟🌟
+              sixWeekMonthsEnforced: true, 
               
               headerStyle: const HeaderStyle(
                 titleCentered: true, formatButtonVisible: false,

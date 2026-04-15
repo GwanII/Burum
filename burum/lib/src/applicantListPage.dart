@@ -41,8 +41,15 @@ class Applicant {
 
 class ApplicantListPage extends StatefulWidget {
   final String postId;
+  final String postTitle;
+  final String postDeadline;
 
-  const ApplicantListPage({super.key, required this.postId});
+  const ApplicantListPage({
+    super.key, 
+    required this.postId,
+    required this.postTitle,    // 🌟 성빈이가 추가 
+    required this.postDeadline  // 🌟 성빈이가 추가
+  });
 
   @override
   State<ApplicantListPage> createState() => _ApplicantListPageState();
@@ -131,7 +138,7 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
     );
   }
 
-  // 🌟 선택하기 (수락) 로직
+// 🌟 선택하기 (수락) 로직
   Future<void> _assignApplicant(int applicantId, String applicantName) async {
     bool confirm =
         await showDialog(
@@ -170,9 +177,26 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
         data: {'userId': applicantId},
       );
       if (response.statusCode == 200 || response.statusCode == 201) {
+        
+        // 🌟 성빈이가 추가한 부분: 심부름 확정 성공 시 캘린더 자동 등록 API 호출!
+        try {
+          await dio.post(
+            '${Config.baseUrl}/api/calendar/errand/dual', // 👈 주소 확인!
+            options: Options(headers: {'Authorization': 'Bearer $token'}),
+            data: {
+              'applicantId': applicantId, 
+              'title': widget.postTitle, 
+              'deadline': widget.postDeadline,
+            },
+          );
+
+        } catch (calendarError) {
+          print('🚨 캘린더 등록 실패: $calendarError');
+        }
+
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('🎉 $applicantName님이 선택되었습니다!')),
+            SnackBar(content: Text('🎉 $applicantName님이 선택되고 캘린더에 등록되었습니다!')),
           );
           setState(() => selectedApplicantIds.add(applicantId));
         }
@@ -182,7 +206,7 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
     }
   }
 
-  // 🌟 선택 취소하기 (이중 경고 팝업 완벽 복구!)
+  // 🌟 선택 취소하기
   Future<void> _cancelApplicant(int applicantId, String applicantName) async {
     String? selectedReason;
     final List<String> reasons = [
@@ -324,9 +348,24 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
           );
 
           if (response.statusCode == 200) {
+            
+            // 🌟 성빈이가 추가한 부분: 심부름 취소 성공 시 캘린더 일정 자동 삭제 API 호출!
+            try {
+              await dio.delete(
+                '${Config.baseUrl}/api/calendar/errand/dual',
+                options: Options(headers: {'Authorization': 'Bearer $token'}),
+                data: {
+                  'applicantId': applicantId,
+                  'title': widget.postTitle, 
+                },
+              );
+            } catch (calendarError) {
+              print('🚨 캘린더 삭제 실패: $calendarError');
+            }
+
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('❌ $applicantName님 선택이 취소되었습니다.')),
+                SnackBar(content: Text('❌ $applicantName님 선택이 취소되고 캘린더에서 삭제되었습니다.')),
               );
               setState(() => selectedApplicantIds.remove(applicantId));
             }
