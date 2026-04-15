@@ -1,14 +1,14 @@
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'dart:convert';
+import 'package:dio/dio.dart'; // 💡 http 대신 Dio 추가!
+import 'dart:convert'; // _parseTags에서 혹시 모를 String 파싱을 위해 남겨둠
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 import 'mapScreen.dart';
 import 'myPageScreen.dart';
 import 'postDetailScreen.dart';
 import 'writerDetailPage.dart';
-import '../config.dart';
-
+// import '../config.dart'; // 🗑️ DioClient 내부에서 이미 BaseUrl을 쓰고 있으므로 여기선 필요 없음!
+import '../dio_client.dart'; // 🌟 우리의 행동대장 DioClient 호출!
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,17 +19,17 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _selectedIndex = 0;
-  List<dynamic> _posts = [];
+  List<dynamic> _posts = []; // API에서 받아온 원본 데이터 보관
+  List<dynamic> _filteredPosts = []; // 🌟 화면에 보여줄(검색 필터링된) 데이터
   List<String> _trendingTags = [];
   bool _isLoading = true;
+
+  // 🌟 검색어를 다루기 위한 컨트롤러
+  final TextEditingController _searchController = TextEditingController();
 
   String currentLoggedInUser = "";
   String currentUserId = "";
   final storage = const FlutterSecureStorage();
-
-  // ⚠️ 중요: 환경에 맞춰 주석 해제 (지금은 크롬/웹 기준)
-  //final String baseUrl = "http://localhost:3000/api";
-  // final String baseUrl = "http://10.0.2.2:3000/api"; // 안드로이드 에뮬레이터용
 
   @override
   void initState() {
@@ -38,33 +38,27 @@ class _HomeScreenState extends State<HomeScreen> {
     _fetchAllData();
   }
 
+  @override
+  void dispose() {
+    // 🌟 메모리 누수 방지를 위해 컨트롤러 닫기
+    _searchController.dispose();
+    super.dispose();
+  }
+
+  // 🌟 변경 포인트 1: 닉네임 로드
   Future<void> _loadUserNickname() async {
-    final token =
-        await storage.read(key: 'accessToken') ??
-        await storage.read(key: 'FlutterSecureStorage.accessToken');
-
-    if (token == null) return;
-
     try {
-      final response = await http.get(
-        Uri.parse('${Config.baseUrl}/api/posts/profile'),
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': 'Bearer $token',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final data = json.decode(response.body);
-        setState(() {
-          currentLoggedInUser = data['nickname'] ?? "";
-          currentUserId = data['id']?.toString() ?? data['user_id']?.toString() ?? "";
-        });
-      } else {
-        print("서버 응답 에러: ${response.statusCode}");
-      }
+      final response = await DioClient.instance.get('/api/posts/profile');
+      final data = response.data;
+      setState(() {
+        currentLoggedInUser = data['nickname'] ?? "";
+        currentUserId =
+            data['id']?.toString() ?? data['user_id']?.toString() ?? "";
+      });
+    } on DioException catch (e) {
+      print("닉네임 통신 에러(Dio): ${e.response?.statusCode} - ${e.message}");
     } catch (e) {
-      print("닉네임 통신 에러: $e");
+      print("닉네임 통신 에러(기타): $e");
     }
   }
 
@@ -75,14 +69,14 @@ class _HomeScreenState extends State<HomeScreen> {
     });
   }
 
+  // 🌟 변경 포인트 2: 게시글 목록 로드 및 초기 필터 설정
   Future<void> _fetchPosts() async {
     try {
-      final response = await http.get(Uri.parse('${Config.baseUrl}/api/posts'));
-      if (response.statusCode == 200) {
-        setState(() {
-          _posts = json.decode(response.body);
-        });
-      }
+      final response = await DioClient.instance.get('/api/posts');
+      setState(() {
+        _posts = response.data;
+        _filteredPosts = _posts; // 🌟 처음엔 전체 리스트를 보여주기 위해 그대로 복사!
+      });
     } catch (e) {
       print('게시글 로드 실패: $e');
     }
@@ -90,15 +84,37 @@ class _HomeScreenState extends State<HomeScreen> {
 
   Future<void> _fetchTrendingTags() async {
     try {
-      final response = await http.get(Uri.parse('${Config.baseUrl}/api/posts/trending')); 
-      if (response.statusCode == 200) {
-        setState(() {
-          _trendingTags = List<String>.from(json.decode(response.body));
-        });
-      }
+      final response = await DioClient.instance.get('/api/posts/trending');
+      setState(() {
+        _trendingTags = List<String>.from(response.data);
+      });
     } catch (e) {
       print('태그 로드 실패: $e');
     }
+  }
+
+  // 🌟 [추가된 기능] 검색 필터링 로직!
+  void _runFilter(String enteredKeyword) {
+    List<dynamic> results = [];
+    if (enteredKeyword.isEmpty) {
+      // 검색어가 비어있으면 원본 리스트 전체 보여주기
+      results = _posts;
+    } else {
+      // 대소문자 구분 없이 검색하기 위해 toLowerCase() 사용
+      results = _posts.where((post) {
+        final title = (post['title'] ?? '').toLowerCase();
+        final content = (post['content'] ?? '').toLowerCase();
+        final keyword = enteredKeyword.toLowerCase();
+
+        // 제목이나 내용에 검색어가 포함되어 있으면 리스트에 남김
+        return title.contains(keyword) || content.contains(keyword);
+      }).toList();
+    }
+
+    // 화면 갱신
+    setState(() {
+      _filteredPosts = results;
+    });
   }
 
   String _formatDate(String? dateStr) {
@@ -155,7 +171,8 @@ class _HomeScreenState extends State<HomeScreen> {
         child: Column(
           children: [
             const SizedBox(height: 20),
-            // 검색창
+
+            // 🌟 검색창 영역
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 20),
               child: Container(
@@ -164,8 +181,11 @@ class _HomeScreenState extends State<HomeScreen> {
                   borderRadius: BorderRadius.circular(30),
                   border: Border.all(color: Colors.grey.shade400),
                 ),
-                child: const TextField(
-                  decoration: InputDecoration(
+                child: TextField(
+                  controller: _searchController,
+                  onChanged: (value) =>
+                      _runFilter(value), // 🌟 타이핑할 때마다 필터링 함수 실행!
+                  decoration: const InputDecoration(
                     hintText: '찾는 심부름을 검색해보세요!',
                     border: InputBorder.none,
                     contentPadding: EdgeInsets.symmetric(
@@ -231,8 +251,23 @@ class _HomeScreenState extends State<HomeScreen> {
                   const SizedBox(height: 20),
                   _isLoading
                       ? const Center(child: CircularProgressIndicator())
+                      : _filteredPosts
+                            .isEmpty // 🌟 검색 결과가 없을 때 처리
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(20.0),
+                            child: Text(
+                              '검색 결과가 없습니다 🥲',
+                              style: TextStyle(
+                                fontSize: 16,
+                                color: Colors.grey,
+                              ),
+                            ),
+                          ),
+                        )
                       : Column(
-                          children: _posts.map((post) {
+                          // 🌟 이제 원본 _posts가 아니라 _filteredPosts를 그립니다!
+                          children: _filteredPosts.map((post) {
                             return Column(
                               children: [
                                 _buildErrandItem(
@@ -263,7 +298,6 @@ class _HomeScreenState extends State<HomeScreen> {
           ],
         ),
       ),
-
       floatingActionButton: FloatingActionButton.extended(
         onPressed: () {
           Navigator.push(
@@ -314,20 +348,12 @@ class _HomeScreenState extends State<HomeScreen> {
   }) {
     return InkWell(
       onTap: () {
-        print('====================================');
-        print('👉 내 닉네임(currentLoggedInUser) : [$currentLoggedInUser]');
-        print('👉 게시글 작성자(nickname) : [$nickname]');
-        print('👉 둘이 완전히 똑같은가요? : ${nickname == currentLoggedInUser}');
-        print('====================================');
-
         if (currentLoggedInUser.isNotEmpty && nickname == currentLoggedInUser) {
           Navigator.push(
             context,
             MaterialPageRoute(
               builder: (context) => writerDetailPage(
-                // 💡 만약 내가 쓴 글 페이지에서도 수정/삭제를 위해 postId가 필요하다면
-                // writerDetailPage 파일에 들어가서 postId 변수를 추가해주셔야 합니다!
-                postId: postId, 
+                postId: postId,
                 title: title,
                 content: desc,
                 price: price,
@@ -343,7 +369,7 @@ class _HomeScreenState extends State<HomeScreen> {
             context,
             MaterialPageRoute(
               builder: (context) => PostDetailScreen(
-                postId: postId, // 🌟 핵심 추가 포인트 3: PostDetailScreen으로 postId 넘겨주기!
+                postId: postId,
                 title: title,
                 content: desc,
                 currentUserId: currentUserId,

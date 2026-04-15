@@ -29,15 +29,28 @@ class DioClient {
               e.response?.data?['code'] == 'TOKEN_EXPIRED') {
             print('💡 Dio: 액세스 토큰 만료 감지! 백그라운드 재발급 시도 중...');
 
+            // 1. 요청에 사용되었던 만료된 토큰과 현재 디바이스에 저장된 토큰 가져오기
+            final requestAccessToken = e.requestOptions.headers['Authorization']
+                ?.toString()
+                .replaceAll('Bearer ', '');
+            final currentAccessToken = await _storage.read(key: 'accessToken');
+
             try {
-              // 2. 토큰 재발급 요청
-              final newAccessToken = await _refreshToken();
+              String? validAccessToken = currentAccessToken;
+
+              // 2. 만약 두 토큰이 같다면(아직 갱신 안 됨) 토큰 재발급 요청
+              if (requestAccessToken == currentAccessToken) {
+                validAccessToken = await _refreshToken();
+              } else {
+                // 이미 앞선 에러 처리에서 토큰이 갱신되었다면 API 재호출 생략
+                print('🔄 Dio: 다른 요청에 의해 이미 토큰이 갱신되었습니다. 갱신을 생략합니다.');
+              }
 
               // 3. 재발급 성공 시, 원래 실패했던 요청을 새로운 토큰으로 재시도
               e.requestOptions.headers['Authorization'] =
-                  'Bearer $newAccessToken';
+                  'Bearer $validAccessToken';
               final response = await dio.fetch(e.requestOptions);
-              print('🔄 Dio: 토큰 갱신 완료! 원래 요청을 재전송합니다.');
+              print('🔄 Dio: 원래 요청을 성공적으로 재전송했습니다.');
               return handler.resolve(response);
             } catch (refreshError) {
               // 4. 리프레시 토큰마저 만료되었을 때 (재발급 실패)
