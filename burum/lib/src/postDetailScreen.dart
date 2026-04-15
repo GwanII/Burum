@@ -284,7 +284,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   @override
   Widget build(BuildContext context) {
     // 다은: ********
-    final bool isWriter = currentUserId == writerId;
+    final bool isWriter = widget.currentUserId == widget.writerId;
     //
     return Scaffold(
       backgroundColor: Colors.white,
@@ -455,41 +455,40 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       // 하단 고정 버튼
       bottomNavigationBar: SafeArea(
-        child: Padding(
-          padding: const EdgeInsets.all(15.0),
-
-              // 🌟 지원 상태(_isApplied)에 따라 버튼 텍스트와 액션, 색상이 변함!
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    if (_isApplied) {
-                      _showCancelDialog(); // 이미 지원했다면 취소 다이얼로그
-                    } else {
-                      _showApplyDialog(); // 아직 지원 안 했다면 지원 다이얼로그
-                    }
-                  },
-                  style: ElevatedButton.styleFrom(
-                    // 지원 완료 상태면 약간 회색 톤으로, 아니면 원래 노란색으로 표시
-                    backgroundColor: _isApplied
-                        ? Colors.grey.shade300
-                        : const Color(0xFFFFF176),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: Text(
-                    _isApplied ? '지원 취소하기' : '지원하기',
-                    style: TextStyle(
-                      color: _isApplied ? Colors.redAccent : Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ],
-                ),
+  child: Padding(
+    padding: const EdgeInsets.all(15.0),
+    child: SizedBox(
+      width: double.infinity,
+      child: ElevatedButton(
+        onPressed: () {
+          if (_isApplied) {
+            _showCancelDialog();
+          } else {
+            _showApplyDialog();
+          }
+        },
+        style: ElevatedButton.styleFrom(
+          backgroundColor: _isApplied
+              ? Colors.grey.shade300
+              : const Color(0xFFFFF176),
+          elevation: 0,
+          padding: const EdgeInsets.symmetric(vertical: 15),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(30),
+          ),
+        ),
+        child: Text(
+          _isApplied ? '지원 취소하기' : '지원하기',
+          style: TextStyle(
+            color: _isApplied ? Colors.redAccent : Colors.black,
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
+    ),
+  ),
+),
     );
   }
 }
