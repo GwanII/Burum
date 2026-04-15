@@ -269,7 +269,11 @@ class writerDetailPage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        builder: (context) => ApplicantListPage(postId: postId),
+                        builder: (context) => ApplicantListPage(
+                          postId: postId,
+                          postTitle: title, // 성빈이가 추가
+                          postDeadline: date, // 성빈이가 추가
+                        ),
                       ),
                     );
                   },

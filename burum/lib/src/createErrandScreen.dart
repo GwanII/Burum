@@ -1,22 +1,21 @@
-// 모바일에서 사진 가져올람 dart:io가 필요한데 얘가 웹에서는 움직이질 않노;;
-// 그래서 웹으로 작업할 땐 관련 코드 싹다 봉인해놨음.
-// 실사용 때는 봉인을 '해제' 해야함.
+// 모바일에서 사진 가져올 때 dart:io가 필요하지만 웹에서는 동작하지 않습니다.
+// 따라서 웹 환경 작업 시에는 관련 코드를 주석 처리합니다.
+// 실사용 환경(모바일)에서는 주석을 해제해야 합니다.
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:dio/dio.dart';
 import 'dart:convert';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'main_Screen.dart';
 import 'postDetailScreen.dart';
 import '../config.dart';
+import '../dio_client.dart'; 
 
-// import 'dart:io'; // 💡 웹 에러의 원흉인 File 마법을 임시 봉인하오!
-// 이미지이미지이미지이미지이미지이미지이미지
-// import 'package:image_picker/image_picker.dart'; // 💡 사진 찍기 마법도 임시 봉인하오!
-// 이미지이미지이미지이미지이미지이미지이미지
+// import 'dart:io'; // 웹 에러 원인인 File 클래스 임시 주석 처리
+// import 'package:image_picker/image_picker.dart'; // 사진 선택 기능 임시 주석 처리
 
-// 🌟🌟🌟 천 단위로 쉼표(,)를 팍팍 찍어주는 요정!!!!! 🌟🌟🌟
+// 천 단위 구분 기호 텍스트 포맷터
 class ThousandsSeparatorInputFormatter extends TextInputFormatter {
   @override
   TextEditingValue formatEditUpdate(
@@ -60,7 +59,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   List<String> _tags = [];
 
   List<String> _selectedImages = [];
-  // 이미지이미지이미지이미지이미지이미지이미지
 
   Future<void> _pickImages() async {
     setState(() {
@@ -68,7 +66,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       if (remainingSlots <= 0) {
         ScaffoldMessenger.of(
           context,
-        ).showSnackBar(const SnackBar(content: Text('사진은 최대 10장까지만')));
+        ).showSnackBar(const SnackBar(content: Text('사진은 최대 10장까지만 첨부할 수 있습니다.')));
         return;
       }
       _selectedImages.add(
@@ -76,7 +74,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       );
     });
   }
-  // 이미지이미지이미지이미지이미지이미지이미지
 
   void _removeImage(int index) {
     setState(() {
@@ -114,14 +111,14 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     });
   }
 
-  // 🚨 [경고 팝업 소환 마법!!!!!]
+  // 오류 메시지 다이얼로그
   void _showErrorPopup(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
-          '⚠️ 등록 실패',
+          '등록 실패',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.redAccent,
@@ -144,78 +141,79 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     );
   }
 
-  // 🚀 [진짜 토큰 & 장소/내용 분리형 궁극의 대포!!!!!]
+  // 폼 데이터 전송 로직 (Dio 활용)
   Future<void> _submitErrand() async {
     if (_titleController.text.length > 40) {
       _showErrorPopup(
-        '제목은 40자를 초과할 수 없소!!!!!\n(현재: ${_titleController.text.length}자)',
+        '제목은 40자를 초과할 수 없습니다.\n(현재: ${_titleController.text.length}자)',
       );
       return;
     }
     if (_contentController.text.length > 500) {
       _showErrorPopup(
-        '내용은 500자를 초과할 수 없소!!!!!\n(현재: ${_contentController.text.length}자)',
+        '내용은 500자를 초과할 수 없습니다.\n(현재: ${_contentController.text.length}자)',
       );
       return;
     }
 
     const storage = FlutterSecureStorage();
     String? myAccessToken = await storage.read(key: 'accessToken');
-    //추가 ?
     String? myUserId = await storage.read(key: 'userId');
-    String? myNickname = await storage.read(key: 'nickname');
 
+    // 인증 상태 검증
     if (myAccessToken == null) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이단자여! 로그인을 먼저 하고 오시오!!!!!')),
+          const SnackBar(content: Text('게시물을 작성하려면 로그인이 필요합니다.')),
         );
       }
       return;
     }
 
-    final url = Uri.parse('${Config.baseUrl}/api/createErrand');
-    var request = http.MultipartRequest('POST', url);
-
-    request.headers['Authorization'] = 'Bearer $myAccessToken';
-    request.fields['title'] = _titleController.text;
-    request.fields['content'] = _contentController.text;
-    request.fields['location'] = _locationController.text;
-
     String rawCost = _costController.text.replaceAll(',', '');
-    request.fields['cost'] = rawCost.isEmpty ? '0' : rawCost;
+
+    // FormData 구성
+    final Map<String, dynamic> formDataMap = {
+      'title': _titleController.text,
+      'content': _contentController.text,
+      'location': _locationController.text,
+      'cost': rawCost.isEmpty ? '0' : rawCost,
+      'tags': jsonEncode(_tags),
+      'image_url': _selectedImages.isNotEmpty
+          ? _selectedImages.first
+          : "https://example.com/no-image.png",
+    };
 
     if (_dateController.text.isNotEmpty) {
-      request.fields['deadline'] = _dateController.text;
+      formDataMap['deadline'] = _dateController.text;
     }
-    request.fields['tags'] = jsonEncode(_tags);
 
-    request.fields['image_url'] = _selectedImages.isNotEmpty
-        ? _selectedImages.first
-        : "https://example.com/no-image.png";
+    FormData formData = FormData.fromMap(formDataMap);
 
     try {
-      var streamedResponse = await request.send();
-      var response = await http.Response.fromStream(streamedResponse);
+      // 설정된 전역 DioClient 인스턴스를 통해 API 요청 수행
+      var response = await DioClient.instance.post(
+        '${Config.baseUrl}/api/createErrand',
+        data: formData,
+      );
 
-      if (response.statusCode == 201) {
-        print("🎉 등록 성공");
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        print("게시물 등록 성공");
 
-        //추가
-        var responseData = jsonDecode(response.body);
+        // Dio는 JSON 응답을 자동으로 Map으로 변환합니다.
+        var responseData = response.data;
         String newPostId = responseData['errandId'].toString();
 
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('🎉 심부름이 성공적으로 등록되었소!!!!!')),
+            const SnackBar(content: Text('심부름이 성공적으로 등록되었습니다.')),
           );
 
-          // 🌟🌟🌟 [개조 완료: 동료 코드 보존을 위한 값 넘기기!!!!!] 🌟🌟🌟
+          // 등록 완료 후 상세 화면으로 라우팅 및 데이터 전달
           Navigator.pushReplacement(
             context,
             MaterialPageRoute(
               builder: (context) => PostDetailScreen(
-                //추가
                 postId: newPostId,
                 currentUserId: myUserId ?? '',
                 writerId: myUserId ?? '', //다은 수정
@@ -227,7 +225,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                 date: _dateController.text.isEmpty
                     ? '마감일 없음'
                     : _dateController.text,
-                nickname: '나(작성자)', // 아직 로그인 정보가 없으므로 임시 설정!
+                nickname: '나(작성자)', // 초기 화면용 임시 설정
                 tags: _tags,
                 imageUrl: _selectedImages.isNotEmpty
                     ? _selectedImages.first
@@ -237,11 +235,16 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
           );
         }
       } else {
-        print("적의 방어! 상태 코드: ${response.statusCode}");
-        print("에러 내용: ${response.body}");
+        print("등록 실패. 상태 코드: ${response.statusCode}");
+        print("오류 내용: ${response.data}");
+      }
+    } on DioException catch (e) {
+      print("네트워크 통신 오류 발생: ${e.message}");
+      if (e.response != null) {
+         print("상세 오류 정보: ${e.response?.data}");
       }
     } catch (e) {
-      print("통신망 단절 에러: $e");
+      print("알 수 없는 오류 발생: $e");
     }
   }
 
@@ -258,9 +261,9 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
 
   @override
   Widget build(BuildContext context) {
-    // 🌟🌟🌟 [궁극의 결계 PopScope 발동!!!!!] 🌟🌟🌟
+    // 뒤로가기 동작 제어 컴포넌트
     return PopScope(
-      canPop: false, // 🛡️ 뒤로 가기를 일단 막아버리오!
+      canPop: false, 
       onPopInvoked: (didPop) async {
         if (didPop) return;
 
@@ -271,14 +274,14 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
               borderRadius: BorderRadius.circular(16),
             ),
             title: const Text(
-              '⚠️ 작성 취소 경고',
+              '작성 취소 확인',
               style: TextStyle(
                 fontWeight: FontWeight.bold,
                 color: Colors.redAccent,
               ),
             ),
             content: const Text(
-              '게시물 작성을 취소하시겠습니까?\n작성 중인 내용은 모두 사라집니다!',
+              '게시물 작성을 취소하시겠습니까?\n작성 중인 내용은 저장되지 않습니다.',
               style: TextStyle(fontSize: 16),
             ),
             actions: [
@@ -562,8 +565,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
           currentIndex: 2,
           onTap: (index) {
             if (index == 2) return;
-
-            // 💡 다른 탭을 누르면, 스마트폰의 뒤로 가기를 누른 것과 똑같이 취급하여 팝업을 띄우오!
             Navigator.maybePop(context);
           },
           items: const [
