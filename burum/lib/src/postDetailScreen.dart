@@ -10,6 +10,7 @@ class PostDetailScreen extends StatelessWidget {
   final String title;
   final String content;
   final String currentUserId;
+  final String writerId; // 다은 게시물 작성자 id 추가 ********
   final String price;
   final String date;
   final String nickname;
@@ -19,10 +20,11 @@ class PostDetailScreen extends StatelessWidget {
   // 2. 생성자
   const PostDetailScreen({
     super.key,
-    required this.postId, // 🌟 필수값으로 추가! (이전 화면에서 넘겨줘야 합니다)
+    required this.postId,
     required this.title,
     required this.content,
     required this.currentUserId,
+    required this.writerId, // 다은 ********
     required this.price,
     required this.date,
     required this.nickname,
@@ -32,45 +34,40 @@ class PostDetailScreen extends StatelessWidget {
 
   // 🌟 지원하기 버튼을 눌렀을 때 실행될 통신 함수!
   Future<void> _submitApplication(BuildContext context, String message) async {
-    // 백엔드 API 주소 (상황에 맞게 수정하세요!)
     final url = Uri.parse('${Config.baseUrl}/api/posts/applyErrand');
 
-    // 임시 유저 ID (실제로는 로그인한 유저의 ID를 가져와야 합니다)
     try {
       final response = await http.post(
         url,
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
-          'postId': postId, // 어떤 게시물인지
-          'userId': currentUserId, // 누가 지원하는지
-          'message': message, // 지원 멘트
+          'postId': postId,
+          'userId': currentUserId,
+          'message': message,
         }),
       );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // ✅ 1. 통신 성공 (처음 지원함)
         if (context.mounted) {
-          Navigator.pop(context); // 지원 팝업(다이얼로그) 닫기
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('🎉 지원이 성공적으로 완료되었습니다!')),
           );
         }
       } else if (response.statusCode == 409) {
-        // 🛡️ 2. 중복 지원 방어 (이미 지원한 유저)
         print("적의 방어! 상태 코드: 409 (중복 지원 시도)");
         if (context.mounted) {
-          Navigator.pop(context); // 열려있는 창이 있다면 닫아주기
+          Navigator.pop(context);
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('이미 지원한 심부름입니다! 🙅‍♂️'),
-              backgroundColor: Colors.orange, // 경고 느낌을 주려면 색상을 바꿔도 좋아요
+              backgroundColor: Colors.orange,
             ),
           );
         }
       } else {
-        // ❌ 3. 통신 실패 (기타 400, 500 등 서버 에러)
         print("적의 방어! 상태 코드: ${response.statusCode}");
-        print("서버의 답변: ${response.body}"); // 디버깅을 위해 서버 메시지도 출력!
+        print("서버의 답변: ${response.body}");
         if (context.mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('앗! 지원에 실패했어요. 다시 시도해주세요.')),
@@ -78,7 +75,6 @@ class PostDetailScreen extends StatelessWidget {
         }
       }
     } catch (e) {
-      // 🔌 4. 아예 인터넷이 끊겼거나 서버가 꺼진 경우
       print("통신망 단절 에러: $e");
       if (context.mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -90,6 +86,9 @@ class PostDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 다은: ********
+    final bool isWriter = currentUserId == writerId;
+    //
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -263,151 +262,206 @@ class PostDetailScreen extends StatelessWidget {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(15.0),
-          child: Row(
-            children: [
-              // 채팅하기 버튼
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: 채팅 화면으로 넘어가는 기능 추가
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF90B2AB),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: const Text(
-                    '채팅하기',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
 
-              // 지원하기 버튼
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // 🌟 팝업창 띄우기 전, 입력창의 텍스트를 감시할 컨트롤러 생성!
-                    TextEditingController applyMessageController =
-                        TextEditingController();
-
-                    showDialog(
-                      context: context,
-                      builder: (BuildContext dialogContext) {
-                        return AlertDialog(
-                          backgroundColor: Colors.white,
+          // 다은 통째로 수정************************************************
+          child: isWriter
+              ? Row(
+                  children: [
+                    // 작성자용 버튼 1: 지원자 목록보기
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // TODO: 지원자 목록보기 화면으로 이동
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF90B2AB),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(15),
+                            borderRadius: BorderRadius.circular(30),
                           ),
-                          contentPadding: const EdgeInsets.only(
-                            top: 25,
-                            left: 20,
-                            right: 20,
-                            bottom: 5,
+                        ),
+                        child: const Text(
+                          '지원자 목록보기',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                           ),
-                          content: Column(
-                            mainAxisSize: MainAxisSize.min,
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              const Text(
-                                '심부름 지원',
-                                style: TextStyle(
-                                  fontSize: 16,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              const SizedBox(height: 15),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
 
-                              Container(
-                                decoration: BoxDecoration(
-                                  border: Border.all(
-                                    color: Colors.grey.shade400,
-                                  ),
+                    // 작성자용 버튼 2: 게시물 수정하기
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // TODO: 게시물 수정 화면으로 이동
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF90B2AB),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          '게시물 수정하기',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                )
+              : Row(
+                  children: [
+                    // 일반 사용자 버튼1: 채팅하기 
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          // TODO: 채팅 화면으로 넘어가는 기능 추가
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF90B2AB),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          '채팅하기',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ),
+                    const SizedBox(width: 15),
+
+                    // 일반 사용자 버튼2: 지원하기 
+                    Expanded(
+                      child: ElevatedButton(
+                        onPressed: () {
+                          TextEditingController applyMessageController =
+                              TextEditingController();
+
+                          showDialog(
+                            context: context,
+                            builder: (BuildContext dialogContext) {
+                              return AlertDialog(
+                                backgroundColor: Colors.white,
+                                shape: RoundedRectangleBorder(
                                   borderRadius: BorderRadius.circular(15),
                                 ),
-                                child: TextField(
-                                  controller:
-                                      applyMessageController, // 🌟 컨트롤러 연결!
-                                  maxLines: 5,
-                                  decoration: const InputDecoration(
-                                    hintText: '자기 소개, 각오 등 하고싶은 말을 적어주세요!',
-                                    hintStyle: TextStyle(
-                                      color: Colors.grey,
-                                      fontSize: 13,
-                                    ),
-                                    border: InputBorder.none,
-                                    contentPadding: EdgeInsets.all(15),
-                                  ),
+                                contentPadding: const EdgeInsets.only(
+                                  top: 25,
+                                  left: 20,
+                                  right: 20,
+                                  bottom: 5,
                                 ),
-                              ),
-                            ],
-                          ),
-                          actions: [
-                            TextButton(
-                              onPressed: () => Navigator.pop(dialogContext),
-                              child: const Text(
-                                '취소',
-                                style: TextStyle(color: Colors.black),
-                              ),
-                            ),
-                            TextButton(
-                              onPressed: () {
-                                // 🌟 지원 버튼을 누르면 컨트롤러에서 텍스트를 뽑아 서버로 보냅니다!
-                                String message = applyMessageController.text
-                                    .trim();
-                                if (message.isEmpty) {
-                                  ScaffoldMessenger.of(context).showSnackBar(
-                                    const SnackBar(
-                                      content: Text('지원 멘트를 작성해주세요!'),
+                                content: Column(
+                                  mainAxisSize: MainAxisSize.min,
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    const Text(
+                                      '심부름 지원',
+                                      style: TextStyle(
+                                        fontSize: 16,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  );
-                                  return;
-                                }
+                                    const SizedBox(height: 15),
 
-                                // 통신 함수 실행!
-                                _submitApplication(context, message);
-                              },
-                              child: const Text(
-                                '지원',
-                                style: TextStyle(
-                                  color: Colors.black,
-                                  fontWeight: FontWeight.bold,
+                                    Container(
+                                      decoration: BoxDecoration(
+                                        border: Border.all(
+                                          color: Colors.grey.shade400,
+                                        ),
+                                        borderRadius: BorderRadius.circular(15),
+                                      ),
+                                      child: TextField(
+                                        controller: applyMessageController,
+                                        maxLines: 5,
+                                        decoration: const InputDecoration(
+                                          hintText: '자기 소개, 각오 등 하고싶은 말을 적어주세요!',
+                                          hintStyle: TextStyle(
+                                            color: Colors.grey,
+                                            fontSize: 13,
+                                          ),
+                                          border: InputBorder.none,
+                                          contentPadding: EdgeInsets.all(15),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
                                 ),
-                              ),
-                            ),
-                          ],
-                        );
-                      },
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF90B2AB),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
+                                actions: [
+                                  TextButton(
+                                    onPressed: () => Navigator.pop(dialogContext),
+                                    child: const Text(
+                                      '취소',
+                                      style: TextStyle(color: Colors.black),
+                                    ),
+                                  ),
+                                  TextButton(
+                                    onPressed: () {
+                                      String message =
+                                          applyMessageController.text.trim();
+
+                                      if (message.isEmpty) {
+                                        ScaffoldMessenger.of(context)
+                                            .showSnackBar(
+                                          const SnackBar(
+                                            content: Text('지원 멘트를 작성해주세요!'),
+                                          ),
+                                        );
+                                        return;
+                                      }
+
+                                      _submitApplication(context, message);
+                                    },
+                                    child: const Text(
+                                      '지원',
+                                      style: TextStyle(
+                                        color: Colors.black,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ],
+                              );
+                            },
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF90B2AB),
+                          elevation: 0,
+                          padding: const EdgeInsets.symmetric(vertical: 15),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(30),
+                          ),
+                        ),
+                        child: const Text(
+                          '지원하기',
+                          style: TextStyle(
+                            color: Colors.black,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    '지원하기',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );
