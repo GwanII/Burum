@@ -132,85 +132,98 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> fetchMessages({bool refreshOnly = false}) async {
-    if (isFetchingMessages) return;
+  if (isFetchingMessages) return;
 
-    isFetchingMessages = true;
+  isFetchingMessages = true;
 
-    try {
-      final response = await http.get(
-        Uri.parse("$Config.baseUrl/api/chat/messages/${widget.room.roomId}"),
-      );
+  try {
+    final url = "${Config.baseUrl}/api/chat/messages/${widget.room.roomId}";
+    print("메시지 조회 URL = $url"); // [추가] 실제 요청 주소 확인
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+    final response = await http.get(Uri.parse(url));
 
-        if (!mounted) return;
+    print("메시지 조회 상태코드 = ${response.statusCode}"); // [추가]
+    print("메시지 조회 headers = ${response.headers}"); // [추가]
+    print("메시지 조회 body = ${response.body}"); // [추가]
 
-        final fetchedMessages =
-            data.map((json) => Message.fromJson(json)).toList();
+    if (response.statusCode == 200) {
+      final List data = jsonDecode(response.body);
 
-        setState(() {
-          messages = fetchedMessages;
+      if (!mounted) return;
+
+      final fetchedMessages =
+          data.map((json) => Message.fromJson(json)).toList();
+
+      setState(() {
+        messages = fetchedMessages;
+      });
+
+      if (!refreshOnly) {
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          await _scrollToBottom(animated: true);
         });
-
-        if (!refreshOnly) {
-          WidgetsBinding.instance.addPostFrameCallback((_) async {
-            await _scrollToBottom(animated: true);
-          });
-        }
       }
-    } catch (e) {
-      debugPrint("fetchMessages error: $e");
-    } finally {
-      isFetchingMessages = false;
+    } else {
+      debugPrint("fetchMessages failed: ${response.body}");
     }
+  } catch (e) {
+    debugPrint("fetchMessages error: $e");
+  } finally {
+    isFetchingMessages = false;
   }
+}
 
-  Future<void> sendMessage() async {
-    if (controller.text.trim().isEmpty || isSending) return;
+ Future<void> sendMessage() async {
+  if (controller.text.trim().isEmpty || isSending) return;
 
-    final content = controller.text.trim();
+  final content = controller.text.trim();
 
-    setState(() {
-      isSending = true;
-    });
+  setState(() {
+    isSending = true;
+  });
 
-    try {
-      final response = await http.post(
-        Uri.parse("$Config.baseUrl/api/chat/message"),
-        headers: {"Content-Type": "application/json"},
-        body: jsonEncode({
-          "chatRoomId": widget.room.roomId,
-          "senderId": widget.currentUserId,
-          "content": content,
-        }),
-      );
+  try {
+    final url = "${Config.baseUrl}/api/chat/message";
+    print("메시지 전송 URL = $url"); // [추가]
 
-      if (response.statusCode == 200) {
-        controller.clear();
-      } else {
-        debugPrint("sendMessage failed: ${response.body}");
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
-          );
-        }
-      }
-    } catch (e) {
-      debugPrint("sendMessage error: $e");
+    final response = await http.post(
+      Uri.parse(url),
+      headers: {"Content-Type": "application/json"},
+      body: jsonEncode({
+        "chatRoomId": widget.room.roomId,
+        "senderId": widget.currentUserId,
+        "content": content,
+      }),
+    );
+
+    print("메시지 전송 상태코드 = ${response.statusCode}"); // [추가]
+    print("메시지 전송 body = ${response.body}"); // [추가]
+
+    if (response.statusCode == 200) {
+      controller.clear();
+    } else {
+      debugPrint("sendMessage failed: ${response.body}");
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
+          const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
         );
       }
-    } finally {
-      if (mounted) {
-        setState(() {
-          isSending = false;
-        });
-      }
+    }
+  } catch (e) {
+    debugPrint("sendMessage error: $e");
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
+      );
+    }
+  } finally {
+    if (mounted) {
+      setState(() {
+        isSending = false;
+      });
     }
   }
+}
 
   Future<void> pickAndSendImage() async {
     if (isUploadingImage) return;
@@ -241,7 +254,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse("$Config.baseUrl/api/chat/image"),
+        Uri.parse("${Config.baseUrl}/api/chat/image"),
       )
         ..fields['chatRoomId'] = widget.room.roomId.toString()
         ..fields['senderId'] = widget.currentUserId.toString()
@@ -357,6 +370,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             builder: (_) => PostDetailScreen(
               postId: widget.room.postId.toString(),
               currentUserId: widget.currentUserId.toString(),
+              writerId: widget.room.postWriterId.toString(),
               title: widget.room.postTitle ?? '게시물 정보 없음',
               content: widget.room.postContent ?? '내용 없음',
               price: '${widget.room.postCost ?? 0}',

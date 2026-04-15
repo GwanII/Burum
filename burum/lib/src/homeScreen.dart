@@ -271,11 +271,10 @@ class _HomeScreenState extends State<HomeScreen> {
                             return Column(
                               children: [
                                 _buildErrandItem(
-                                  postId:
-                                      post['id']?.toString() ??
-                                      post['post_id']?.toString() ??
-                                      post['_id']?.toString() ??
-                                      '',
+                                  // 🌟 핵심 추가 포인트 1: 백엔드 데이터에서 ID 뽑아내기
+                                  // 서버가 id, post_id, _id 중 무엇을 쓸지 몰라 방어적으로 작성했습니다.
+                                  postId: post['id']?.toString() ?? post['post_id']?.toString() ?? post['_id']?.toString() ?? '',
+                                  writerId: post['writer_id']?.toString() ?? post['user_id']?.toString() ?? post['writerId']?.toString() ?? '', // 다은 작성자 id 추가
                                   title: post['title'] ?? '',
                                   desc: post['content'] ?? '',
                                   price: '${post['cost']}원',
@@ -337,7 +336,8 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   Widget _buildErrandItem({
-    required String postId,
+    required String postId, // 🌟 핵심 추가 포인트 2: 파라미터로 postId 받기
+    required String writerId, // 다은 수정
     required String title,
     required String desc,
     required String price,
@@ -373,6 +373,7 @@ class _HomeScreenState extends State<HomeScreen> {
                 title: title,
                 content: desc,
                 currentUserId: currentUserId,
+                writerId: writerId, // 다은 수정
                 price: price,
                 date: deadlineInfo,
                 nickname: nickname,

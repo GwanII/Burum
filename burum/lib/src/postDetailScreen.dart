@@ -9,6 +9,7 @@ class PostDetailScreen extends StatefulWidget {
   final String title;
   final String content;
   final String currentUserId;
+  final String writerId; // 다은 게시물 작성자 id 추가 ********
   final String price;
   final String date;
   final String nickname;
@@ -25,6 +26,7 @@ class PostDetailScreen extends StatefulWidget {
     required this.title,
     required this.content,
     required this.currentUserId,
+    required this.writerId, // 다은 ********
     required this.price,
     required this.date,
     required this.nickname,
@@ -281,6 +283,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 다은: ********
+    final bool isWriter = currentUserId == writerId;
+    //
     return Scaffold(
       backgroundColor: Colors.white,
       appBar: AppBar(
@@ -452,33 +457,6 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
       bottomNavigationBar: SafeArea(
         child: Padding(
           padding: const EdgeInsets.all(15.0),
-          child: Row(
-            children: [
-              // 채팅하기 버튼
-              Expanded(
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: 채팅 화면으로 넘어가는 기능 추가
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF90B2AB),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(vertical: 15),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(30),
-                    ),
-                  ),
-                  child: const Text(
-                    '채팅하기',
-                    style: TextStyle(
-                      color: Colors.black,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 15),
 
               // 🌟 지원 상태(_isApplied)에 따라 버튼 텍스트와 액션, 색상이 변함!
               Expanded(
@@ -508,11 +486,8 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
-                  ),
+                  ],
                 ),
-              ),
-            ],
-          ),
         ),
       ),
     );

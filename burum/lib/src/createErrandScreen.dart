@@ -218,6 +218,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                 //추가
                 postId: newPostId,
                 currentUserId: myUserId ?? '',
+                writerId: myUserId ?? '', //다은 수정
                 title: _titleController.text,
                 content: _contentController.text,
                 price: _costController.text.isEmpty
