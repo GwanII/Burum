@@ -50,6 +50,7 @@ dependencies:
   dio: ^5.9.2
   intl: ^0.20.0
 
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
