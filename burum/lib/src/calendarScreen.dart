@@ -395,6 +395,19 @@ class _CalendarScreenState extends State<CalendarScreen> {
         elevation: 0,
         title: const Text('캘린더', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 24)),
         centerTitle: false,
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.refresh, color: Colors.black, size: 28),
+            tooltip: '일정 새로고침',
+            onPressed: () {
+              _fetchEventsFromDatabase();
+              ScaffoldMessenger.of(context).showSnackBar(
+                const SnackBar(content: Text('🔄 캘린더 요정들을 강제로 깨웠소!!!!!'), duration: Duration(seconds: 1))
+              );
+            },
+          ),
+          const SizedBox(width: 8),
+        ],
       ),
       body: Column(
         children: [
