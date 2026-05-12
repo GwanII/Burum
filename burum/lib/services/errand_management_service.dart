@@ -34,19 +34,20 @@ class ErrandManagementService {
     return [];
   }
 
-  Future<List<ErrandManageItem>> getMyRequestedErrands() async {
-    final myId = await getMyUserId();
+  Future<List<ErrandManageItem>> getMyRequestedErrands(int myId) async {
     final posts = await getAllPosts();
 
     final requestedPosts = posts.where((e) {
-      if (e is! Map<String, dynamic>) return false;
+      if (e is! Map) return false;
       final userId = int.tryParse(e['user_id'].toString()) ?? 0;
       return userId == myId;
     }).toList();
 
     final items = await Future.wait(
       requestedPosts.map((post) async {
-        final postId = int.tryParse(post['id'].toString()) ?? 0;
+        final map = Map<String, dynamic>.from(post as Map);
+        final postId = int.tryParse(map['id'].toString()) ?? 0;
+
         int applicantCount = 0;
 
         try {
@@ -57,46 +58,37 @@ class ErrandManagementService {
         }
 
         return ErrandManageItem.fromJson(
-          Map<String, dynamic>.from(post),
+          map,
           applicantCount: applicantCount,
         );
       }),
     );
 
-    items.sort((a, b) {
-      final aTime = a.deadline?.millisecondsSinceEpoch ?? 0;
-      final bTime = b.deadline?.millisecondsSinceEpoch ?? 0;
-      return bTime.compareTo(aTime);
-    });
-
+    items.sort((a, b) => b.id.compareTo(a.id));
     return items;
   }
 
-  Future<List<ErrandManageItem>> getMyAssignedErrands() async {
-    final myId = await getMyUserId();
+  Future<List<ErrandManageItem>> getMyAssignedErrands(int myId) async {
     final posts = await getAllPosts();
 
     final assignedPosts = posts.where((e) {
-      if (e is! Map<String, dynamic>) return false;
+      if (e is! Map) return false;
+
       final assignedUserId = e['assigned_user_id'];
       if (assignedUserId == null) return false;
+
       final parsed = int.tryParse(assignedUserId.toString()) ?? 0;
       return parsed == myId;
     }).toList();
 
     final items = assignedPosts.map((post) {
       return ErrandManageItem.fromJson(
-        Map<String, dynamic>.from(post),
+        Map<String, dynamic>.from(post as Map),
         applicantCount: 0,
       );
     }).toList();
 
-    items.sort((a, b) {
-      final aTime = a.deadline?.millisecondsSinceEpoch ?? 0;
-      final bTime = b.deadline?.millisecondsSinceEpoch ?? 0;
-      return bTime.compareTo(aTime);
-    });
-
+    items.sort((a, b) => b.id.compareTo(a.id));
     return items;
   }
 

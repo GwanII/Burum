@@ -1,3 +1,5 @@
+import 'dart:convert';
+
 class ErrandManageItem {
   final int id;
   final int userId;
@@ -10,6 +12,8 @@ class ErrandManageItem {
   final String location;
   final int? assignedUserId;
   final int applicantCount;
+  final String nickname;
+  final List<String> tags;
 
   ErrandManageItem({
     required this.id,
@@ -23,6 +27,8 @@ class ErrandManageItem {
     required this.location,
     required this.assignedUserId,
     required this.applicantCount,
+    required this.nickname,
+    required this.tags,
   });
 
   factory ErrandManageItem.fromJson(
@@ -43,7 +49,21 @@ class ErrandManageItem {
           ? null
           : _toInt(json['assigned_user_id']),
       applicantCount: applicantCount,
+      nickname: (json['nickname'] ??
+              json['writerNickname'] ??
+              json['writer_nickname'] ??
+              '알 수 없음')
+          .toString(),
+      tags: _parseTags(json['tags']),
     );
+  }
+
+  bool get hasNewApplicantNotice {
+    return status == 'WAITING' && applicantCount > 0;
+  }
+
+  bool get hasAssignedNotice {
+    return status == 'IN_PROGRESS' && assignedUserId != null;
   }
 
   static int _toInt(dynamic value) {
@@ -66,5 +86,25 @@ class ErrandManageItem {
     final text = value.toString().trim();
     if (text.isEmpty || text.toLowerCase() == 'null') return null;
     return text;
+  }
+
+  static List<String> _parseTags(dynamic value) {
+    if (value == null) return [];
+
+    if (value is List) {
+      return value.map((e) => e.toString()).toList();
+    }
+
+    final text = value.toString().trim();
+    if (text.isEmpty || text.toLowerCase() == 'null') return [];
+
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is List) {
+        return decoded.map((e) => e.toString()).toList();
+      }
+    } catch (_) {}
+
+    return [];
   }
 }
