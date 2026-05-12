@@ -9,7 +9,6 @@ import 'src/createErrandScreen.dart';
 import 'src/calendarScreen.dart';
 import 'auth_service.dart';
 import 'navigator_service.dart';
-import 'package:burum/screens/profile_detail_screen.dart';
 
 void main() {
   runApp(const MyApp());
@@ -67,7 +66,7 @@ class _MyAppState extends State<MyApp> {
         useMaterial3: true,
       ),
       // 홈 화면으로 아까 만든 HomeScreen을 보여줘라!
-      home: const ProfileDetailScreen(userId: 6),
+      home: const LoginScreen(),
     );
   }
 }
