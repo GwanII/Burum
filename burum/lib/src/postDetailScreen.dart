@@ -1,7 +1,12 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:dio/dio.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import '../config.dart';
 import '../dio_client.dart';
+import '../models/chat_room.dart';
+import '../screens/chat_room_screen.dart';
 
 // 🌟 상태가 변해야 하므로 StatefulWidget으로 변경!
 class PostDetailScreen extends StatefulWidget {
@@ -455,40 +460,152 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
 
       // 하단 고정 버튼
       bottomNavigationBar: SafeArea(
-  child: Padding(
-    padding: const EdgeInsets.all(15.0),
-    child: SizedBox(
-      width: double.infinity,
-      child: ElevatedButton(
-        onPressed: () {
-          if (_isApplied) {
-            _showCancelDialog();
-          } else {
-            _showApplyDialog();
-          }
-        },
-        style: ElevatedButton.styleFrom(
-          backgroundColor: _isApplied
-              ? Colors.grey.shade300
-              : const Color(0xFFFFF176),
-          elevation: 0,
-          padding: const EdgeInsets.symmetric(vertical: 15),
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(30),
-          ),
-        ),
-        child: Text(
-          _isApplied ? '지원 취소하기' : '지원하기',
-          style: TextStyle(
-            color: _isApplied ? Colors.redAccent : Colors.black,
-            fontSize: 16,
-            fontWeight: FontWeight.bold,
+        child: Padding(
+          padding: const EdgeInsets.all(15.0),
+          // 🌟 본인이 작성한 글일 경우 하단 버튼을 숨기고 싶다면 아래 주석을 참고하세요!
+          // child: isWriter ? const SizedBox.shrink() : Row(
+          child: Row(
+            children: [
+              // 💬 1. 채팅하기 버튼
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () async {
+                    try {
+                      // String으로 되어있는 ID값들을 백엔드 전송을 위해 int로 변환
+                      final int currentUserId = int.parse(widget.currentUserId);
+                      final int writerId = int.parse(widget.writerId);
+                      final int postId = int.parse(widget.postId);
+
+                      // 🌟 1. 백엔드 채팅방 생성/조회 API 호출
+                      // (주의: 실제 Node.js 라우터 주소에 맞게 '/api/chat/room' 부분을 수정하세요)
+                      final url = Uri.parse('${Config.baseUrl}/api/chat/room');
+
+                      final response = await http.post(
+                        url,
+                        headers: {'Content-Type': 'application/json'},
+                        body: jsonEncode({
+                          'user1': currentUserId, // 나
+                          'user2': writerId, // 상대방(글 작성자)
+                          'postId': postId, // 게시물 ID
+                        }),
+                      );
+
+                      if (response.statusCode == 200) {
+                        // 🌟 2. 응답 데이터에서 roomId 추출
+                        final Map<String, dynamic> data = jsonDecode(
+                          response.body,
+                        );
+                        final int roomId = data['roomId'];
+
+                        // 🌟 3. ChatRoom 객체 생성
+                        final chatRoom = ChatRoom(
+                          // [필수 파라미터 5개]
+                          roomId: roomId,
+                          otherUserId: writerId,
+                          otherUserNickname: widget.nickname,
+                          unreadCount: 0, // 새로 들어가는 방이므로 안 읽은 메시지는 0개
+                          isPinned: false, // 기본적으로 상단 고정은 해제 상태(false)
+                          // [선택 파라미터]
+                          postId: postId,
+                          postTitle: widget.title,
+                          postContent: widget.content,
+                          postCost:
+                              int.tryParse(
+                                widget.price.replaceAll(RegExp(r'[^0-9]'), ''),
+                              ) ??
+                              0,
+                          postImage: widget.imageUrl,
+                          postWriterId: writerId,
+                          postDeadline: widget.date,
+                        );
+
+                        // 🌟 4. ChatRoomScreen으로 이동
+                        if (context.mounted) {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => ChatRoomScreen(
+                                room: chatRoom,
+                                currentUserId: currentUserId,
+                              ),
+                            ),
+                          );
+                        }
+                      } else {
+                        if (context.mounted) {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(
+                                '채팅방 생성 실패: 상태 코드 ${response.statusCode}',
+                              ),
+                            ),
+                          );
+                        }
+                      }
+                    } catch (e) {
+                      debugPrint('채팅방 입장 에러: $e');
+                      if (context.mounted) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('서버와 통신 중 오류가 발생했습니다.')),
+                        );
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.white,
+                    side: const BorderSide(color: Color(0xFFFFF176), width: 2),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: const Text(
+                    '채팅하기',
+                    style: TextStyle(
+                      color: Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+
+              const SizedBox(width: 10), // 버튼 사이 간격
+              // 📝 2. 기존 지원하기 / 지원 취소하기 버튼
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    if (_isApplied) {
+                      _showCancelDialog();
+                    } else {
+                      _showApplyDialog();
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: _isApplied
+                        ? Colors.grey.shade300
+                        : const Color(0xFFFFF176),
+                    elevation: 0,
+                    padding: const EdgeInsets.symmetric(vertical: 15),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(30),
+                    ),
+                  ),
+                  child: Text(
+                    _isApplied ? '지원 취소하기' : '지원하기',
+                    style: TextStyle(
+                      color: _isApplied ? Colors.redAccent : Colors.black,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ),
         ),
       ),
-    ),
-  ),
-),
     );
   }
 }
