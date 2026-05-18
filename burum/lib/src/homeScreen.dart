@@ -302,7 +302,9 @@ class _HomeScreenState extends State<HomeScreen> {
         onPressed: () {
           Navigator.push(
             context,
-            MaterialPageRoute(builder: (context) => MapScreen()),
+            MaterialPageRoute(
+              builder: (context) => MapScreen(posts: _filteredPosts),
+            ),
           );
         },
         backgroundColor: const Color(0xFFFFF59D),
