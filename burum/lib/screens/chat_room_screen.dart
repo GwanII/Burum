@@ -137,7 +137,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   isFetchingMessages = true;
 
   try {
-    final url = "${Config.baseUrl}/api/chat/messages/${widget.room.roomId}";
+    final url = "${Config.baseUrl}api/chat/messages/${widget.room.roomId}";
     print("메시지 조회 URL = $url"); // [추가] 실제 요청 주소 확인
 
     final response = await http.get(Uri.parse(url));
@@ -183,7 +183,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   });
 
   try {
-    final url = "${Config.baseUrl}/api/chat/message";
+    final url = "${Config.baseUrl}api/chat/message";
     print("메시지 전송 URL = $url"); // [추가]
 
     final response = await http.post(
@@ -254,7 +254,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse("${Config.baseUrl}/api/chat/image"),
+        Uri.parse("${Config.baseUrl}api/chat/image"),
       )
         ..fields['chatRoomId'] = widget.room.roomId.toString()
         ..fields['senderId'] = widget.currentUserId.toString()
@@ -296,7 +296,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> markAsRead() async {
     try {
       await http.post(
-        Uri.parse("$Config.baseUrl/api/chat/read"),
+        Uri.parse("${Config.baseUrl}api/chat/read"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": widget.room.roomId,
@@ -307,6 +307,19 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       debugPrint("markAsRead error: $e");
     }
   }
+
+  String formatDeadlineForPostDetail(String? rawDate) {
+  if (rawDate == null || rawDate.trim().isEmpty) return '';
+
+  final parsed = DateTime.tryParse(rawDate);
+  if (parsed == null) return rawDate;
+
+  final local = parsed.toLocal();
+  final hour = local.hour.toString().padLeft(2, '0');
+  final minute = local.minute.toString().padLeft(2, '0');
+
+  return '${local.month}/${local.day} $hour:$minute 마감';
+}
 
   String formatTime(DateTime time) {
     final local = time.toLocal();
@@ -374,11 +387,11 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               title: widget.room.postTitle ?? '게시물 정보 없음',
               content: widget.room.postContent ?? '내용 없음',
               price: '${widget.room.postCost ?? 0}',
-              date: widget.room.postDeadline ?? '',
-              nickname: widget.room.otherUserNickname,
-              tags: const [],
+              date: formatDeadlineForPostDetail(widget.room.postDeadline),
+              nickname: widget.room.postWriterNickname ?? widget.room.otherUserNickname,
+              tags: widget.room.postTags,
               imageUrl: widget.room.postImage,
-            ),
+),
           ),
         );
       },

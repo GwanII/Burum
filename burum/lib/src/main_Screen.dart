@@ -23,14 +23,14 @@ class _MainScreenState extends State<MainScreen> {
 
   // 2. 탭을 누를 때마다 보여줄 알맹이 화면들 리스트!
   // (나중에 채팅, 심부름, 캘린더 화면을 만들면 여기에 쏙쏙 넣으시면 됩니다)
-  
+
   //final List<Widget> _screens = [
   // ㄴ 원래 이거였는데 캘린더 새로고침 때문에 밑에 get => 로 바꿧음.
-  List<Widget> get _screens => [  
+  List<Widget> get _screens => [
     const HomeScreen(),
     ChatListScreen(),
     const ErrandManagementScreen(), // 2번 탭 (임시)
-//    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
+    //    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
     const CalendarScreen(), // 3번 탭 (임시)
     CalendarScreen(key: _calendarKey),
     const MyPageScreen(), // 4번 탭 (마이페이지)
@@ -50,11 +50,8 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       // 4. 여기가 핵심! IndexedStack을 쓰면 화면을 전환해도 이전 상태(스크롤 등)가 유지됩니다.
-      body: IndexedStack(
-        index: _selectedIndex,
-        children: _screens,
-      ),
-      
+      body: IndexedStack(index: _selectedIndex, children: _screens),
+
       // 5. 하단 네비게이션 바는 여기서 딱 한 번만 그립니다!
       bottomNavigationBar: BottomNavigationBar(
         type: BottomNavigationBarType.fixed,
@@ -67,10 +64,22 @@ class _MainScreenState extends State<MainScreen> {
         onTap: _onItemTapped,
         items: const [
           BottomNavigationBarItem(icon: Icon(Icons.home_outlined), label: '홈'),
-          BottomNavigationBarItem(icon: Icon(Icons.chat_bubble_outline), label: '채팅'),
-          BottomNavigationBarItem(icon: Icon(Icons.shopping_bag_outlined), label: '심부름'),
-          BottomNavigationBarItem(icon: Icon(Icons.calendar_today_outlined), label: '캘린더'),
-          BottomNavigationBarItem(icon: Icon(Icons.person_outline), label: '마이'),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.chat_bubble_outline),
+            label: '채팅',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.shopping_bag_outlined),
+            label: '심부름',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.calendar_today_outlined),
+            label: '캘린더',
+          ),
+          BottomNavigationBarItem(
+            icon: Icon(Icons.person_outline),
+            label: '마이',
+          ),
         ],
       ),
     );
