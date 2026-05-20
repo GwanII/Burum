@@ -90,7 +90,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
   }
 
   try {
-    final url = "${Config.baseUrl}/api/chat/rooms/$currentUserId";
+    final url = "${Config.baseUrl}api/chat/rooms/$currentUserId";
     print('채팅방 조회 URL = $url');
 
     final response = await http.get(Uri.parse(url));
@@ -154,7 +154,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (currentUserId == null) return;
 
     await http.delete(
-      Uri.parse("$Config.baseUrl/api/chat/rooms/$roomId?userId=$currentUserId"),
+      Uri.parse("${Config.baseUrl}api/chat/rooms/$roomId?userId=$currentUserId"),
     );
     await fetchChatRooms(showLoading: false);
   }
@@ -163,7 +163,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (currentUserId == null) return;
 
     await http.post(
-      Uri.parse("$Config.baseUrl/api/chat/read"),
+      Uri.parse("${Config.baseUrl}api/chat/read"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "roomId": roomId,
@@ -177,7 +177,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     if (currentUserId == null) return;
 
     await http.patch(
-      Uri.parse("$Config.baseUrl/api/chat/rooms/${room.roomId}/pin"),
+      Uri.parse("${Config.baseUrl}api/chat/rooms/${room.roomId}/pin"),
       headers: {"Content-Type": "application/json"},
       body: jsonEncode({
         "userId": currentUserId,

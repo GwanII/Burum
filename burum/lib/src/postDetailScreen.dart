@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:dio/dio.dart';
 import '../dio_client.dart';
+import '../screens/profile_detail_screen.dart'; 
 
 // 🌟 상태가 변해야 하므로 StatefulWidget으로 변경!
 class PostDetailScreen extends StatefulWidget {
@@ -316,44 +317,67 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             const SizedBox(height: 15),
 
             // 프로필 영역
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  const CircleAvatar(
-                    radius: 25,
-                    backgroundImage: NetworkImage('https://picsum.photos/200'),
-                  ),
-                  const SizedBox(width: 15),
-                  Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Text(
-                        widget.nickname,
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      const Text(
-                        '심부름 마스터',
-                        style: TextStyle(fontSize: 12, color: Colors.grey),
-                      ),
-                    ],
-                  ),
-                  const Spacer(),
-                  const Text(
-                    'B급',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF5C6BC0),
-                    ),
-                  ),
-                ],
+Padding(
+  padding: const EdgeInsets.symmetric(horizontal: 20),
+  child: InkWell(
+    borderRadius: BorderRadius.circular(12),
+    onTap: () {
+      final writerUserId = int.tryParse(widget.writerId);
+
+      if (writerUserId == null) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('프로필 정보를 열 수 없습니다.')),
+        );
+        return;
+      }
+
+      Navigator.push(
+        context,
+        MaterialPageRoute(
+          builder: (_) => ProfileDetailScreen(userId: writerUserId),
+        ),
+      );
+    },
+    child: Padding(
+      padding: const EdgeInsets.symmetric(vertical: 6),
+      child: Row(
+        children: [
+          const CircleAvatar(
+            radius: 25,
+            backgroundImage: NetworkImage('https://picsum.photos/200'),
+          ),
+          const SizedBox(width: 15),
+          Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                widget.nickname,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
+              const SizedBox(height: 4),
+              const Text(
+                '심부름 마스터',
+                style: TextStyle(fontSize: 12, color: Colors.grey),
+              ),
+            ],
+          ),
+          const Spacer(),
+          const Text(
+            'B급',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: Color(0xFF5C6BC0),
             ),
+          ),
+        ],
+      ),
+    ),
+  ),
+),
 
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 15),
