@@ -304,10 +304,15 @@ class writerDetailPage extends StatelessWidget {
                     Navigator.push(
                       context,
                       MaterialPageRoute(
-                        // 💡 주의: 백지 상태의 CreateErrandsPage()를 열면 수정이 아니라 '새 글 작성'이 됩니다.
-                        // 나중에 CreateErrandsPage 생성자에 기존 데이터(title, content 등)를
-                        // 넘겨줄 수 있게 만들면 여기서 인자로 쏴주시면 됩니다!
-                        builder: (context) => const CreateErrandsPage(),
+                        builder: (context) => CreateErrandsPage(
+                          postId: postId,
+                          initialTitle: title,
+                          initialContent: content,
+                          initialCost: price,
+                          initialDate: date,
+                          initialTags: tags,
+                          initialImageUrl: imageUrl,
+                        ),
                       ),
                     );
                   },

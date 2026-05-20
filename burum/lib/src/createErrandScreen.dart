@@ -14,7 +14,7 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io' if (dart.library.html) 'dart:html';
 
 import 'main_Screen.dart';
-import 'postDetailScreen.dart';
+import 'writerDetailPage.dart';
 import '../config.dart';
 import '../dio_client.dart';
 
@@ -59,7 +59,26 @@ class ThousandsSeparatorInputFormatter extends TextInputFormatter {
 // =========================================================
 
 class CreateErrandsPage extends StatefulWidget {
-  const CreateErrandsPage({super.key});
+  final String? postId;
+  final String? initialTitle;
+  final String? initialCost;
+  final String? initialDate;
+  final String? initialContent;
+  final String? initialLocation;
+  final List<String>? initialTags;
+  final String? initialImageUrl;
+
+  const CreateErrandsPage({
+    super.key,
+    this.postId,
+    this.initialTitle,
+    this.initialCost,
+    this.initialDate,
+    this.initialContent,
+    this.initialLocation,
+    this.initialTags,
+    this.initialImageUrl,
+  });
 
   @override
   State<CreateErrandsPage> createState() => _CreateErrandsPageState();
@@ -98,6 +117,42 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   LatLng _selectedLatLng = const LatLng(35.154, 128.114);
   GoogleMapController? _mapController;
 
+  @override
+  void initState() {
+    super.initState();
+    if (widget.initialTitle != null) {
+      _titleController.text = widget.initialTitle!;
+    }
+    if (widget.initialContent != null) {
+      _contentController.text = widget.initialContent!;
+    }
+    if (widget.initialLocation != null) {
+      _locationController.text = widget.initialLocation!;
+    }
+    if (widget.initialDate != null) {
+      _dateController.text = widget.initialDate!;
+    }
+    if (widget.initialTags != null) {
+      _tags.addAll(widget.initialTags!);
+    }
+    if (widget.initialCost != null) {
+      String numericString = widget.initialCost!.replaceAll(
+        RegExp(r'[^0-9]'),
+        '',
+      );
+      if (numericString.isNotEmpty) {
+        final buffer = StringBuffer();
+        for (int i = 0; i < numericString.length; i++) {
+          if (i > 0 && (numericString.length - i) % 3 == 0) {
+            buffer.write(',');
+          }
+          buffer.write(numericString[i]);
+        }
+        _costController.text = buffer.toString();
+      }
+    }
+  }
+
   // =========================================================
   // 이미지 선택
   // =========================================================
@@ -116,9 +171,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       if (pickedFiles.isEmpty) return;
 
       setState(() {
-        _selectedImages.addAll(
-          pickedFiles.take(remainingSlots),
-        );
+        _selectedImages.addAll(pickedFiles.take(remainingSlots));
       });
     } catch (e) {
       _showErrorPopup('이미지 선택 중 오류 발생\n$e');
@@ -189,9 +242,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     showDialog(
       context: context,
       builder: (_) => AlertDialog(
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
-        ),
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: const Text(
           '오류 발생',
           style: TextStyle(
@@ -263,9 +314,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       for (XFile image in _selectedImages) {
         if (kIsWeb) {
           final bytes = await image.readAsBytes();
-          imageFiles.add(
-            MultipartFile.fromBytes(bytes, filename: image.name),
-          );
+          imageFiles.add(MultipartFile.fromBytes(bytes, filename: image.name));
         } else {
           imageFiles.add(
             await MultipartFile.fromFile(image.path, filename: image.name),
@@ -285,10 +334,16 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         if (_dateController.text.isNotEmpty) 'deadline': _dateController.text,
       });
 
-      final response = await DioClient.instance.post(
-        '${Config.baseUrl}/api/createErrand',
-        data: formData,
-      );
+      // 게시물 ID가 있으면 수정(PUT), 없으면 생성(POST) 요청 (백엔드 API 주소에 맞게 수정 필요)
+      final response = widget.postId != null
+          ? await DioClient.instance.put(
+              '${Config.baseUrl}/api/posts/${widget.postId}',
+              data: formData,
+            )
+          : await DioClient.instance.post(
+              '${Config.baseUrl}/api/createErrand',
+              data: formData,
+            );
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         final responseData = response.data;
@@ -297,9 +352,11 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         if (!mounted) return;
 
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('심부름 등록 완료 🎉'),
-            duration: Duration(seconds: 2),
+          SnackBar(
+            content: Text(
+              widget.postId != null ? '심부름 수정 완료 🎉' : '심부름 등록 완료 🎉',
+            ),
+            duration: const Duration(seconds: 2),
           ),
         );
 
@@ -308,13 +365,12 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
 
         if (!mounted) return;
 
-        Navigator.pushReplacement(
+        // 수정 완료 후 이전 화면 기록들을 지우고 새로운 작성자 전용 상세 화면을 띄웁니다!
+        Navigator.pushAndRemoveUntil(
           context,
           MaterialPageRoute(
-            builder: (_) => PostDetailScreen(
+            builder: (_) => writerDetailPage(
               postId: newPostId,
-              currentUserId: myUserId ?? '',
-              writerId: myUserId ?? '',
               title: _titleController.text,
               content: _contentController.text,
               price: _costController.text.isEmpty
@@ -325,9 +381,10 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                   : _dateController.text,
               nickname: '나(작성자)',
               tags: _tags,
-              imageUrl: null,
+              imageUrl: widget.initialImageUrl, // 기존 이미지를 그대로 유지
             ),
           ),
+          (route) => route.isFirst, // 스택을 초기 화면(홈)까지 싹 비워주기
         );
       } else {
         _showErrorPopup('서버 오류 발생\n상태 코드: ${response.statusCode}');
@@ -375,9 +432,12 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       appBar: AppBar(
         backgroundColor: mainYellow,
         elevation: 0,
-        title: const Text(
-          '게시물 생성',
-          style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+        title: Text(
+          widget.postId != null ? '게시물 수정' : '게시물 생성',
+          style: const TextStyle(
+            color: Colors.black,
+            fontWeight: FontWeight.bold,
+          ),
         ),
       ),
 
@@ -387,7 +447,6 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-
             // 이미지 업로드 영역
             SingleChildScrollView(
               scrollDirection: Axis.horizontal,
@@ -408,8 +467,10 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                         children: [
                           const Icon(Icons.camera_alt, color: Colors.black54),
                           const SizedBox(height: 4),
-                          Text('${_selectedImages.length}/10', 
-                            style: const TextStyle(color: Colors.black54)),
+                          Text(
+                            '${_selectedImages.length}/10',
+                            style: const TextStyle(color: Colors.black54),
+                          ),
                         ],
                       ),
                     ),
@@ -604,9 +665,9 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                 ),
                 child: _isSubmitting
                     ? const CircularProgressIndicator(color: Colors.black)
-                    : const Text(
-                        '작성 완료',
-                        style: TextStyle(
+                    : Text(
+                        widget.postId != null ? '수정 완료' : '작성 완료',
+                        style: const TextStyle(
                           color: Colors.black,
                           fontWeight: FontWeight.bold,
                           fontSize: 16,
@@ -635,8 +696,7 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       ),
       child: TextField(
         controller: controller,
-        keyboardType:
-            isNumber ? TextInputType.number : TextInputType.text,
+        keyboardType: isNumber ? TextInputType.number : TextInputType.text,
         maxLength: maxLength,
         inputFormatters: formatters,
         decoration: InputDecoration(
