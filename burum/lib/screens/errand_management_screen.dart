@@ -5,8 +5,6 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 
 import 'package:burum/src/createErrandScreen.dart';
-
-// 네 프로젝트 실제 경로가 다르면 여기만 수정!
 import 'package:burum/src/postDetailScreen.dart';
 
 class ErrandManagementScreen extends StatefulWidget {
@@ -27,23 +25,12 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
   List<ErrandManageItem> _requestedErrands = [];
   List<ErrandManageItem> _assignedErrands = [];
 
-  final Set<int> _seenRequestedNoticePostIds = {};
-  final Set<int> _seenAssignedNoticePostIds = {};
-
   bool get _hasRequestedNewNotice {
-    return _requestedErrands.any(
-      (item) =>
-          item.hasNewApplicantNotice &&
-          !_seenRequestedNoticePostIds.contains(item.id),
-    );
+    return _requestedErrands.any((item) => item.hasNewApplicantNotice);
   }
 
   bool get _hasAssignedNewNotice {
-    return _assignedErrands.any(
-      (item) =>
-          item.hasAssignedNotice &&
-          !_seenAssignedNoticePostIds.contains(item.id),
-    );
+    return _assignedErrands.any((item) => item.hasAssignedNotice);
   }
 
   @override
@@ -51,6 +38,12 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
@@ -135,15 +128,15 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
         ),
       ),
     ).then((_) async {
-      setState(() {
+      try {
         if (item.hasNewApplicantNotice) {
-          _seenRequestedNoticePostIds.add(item.id);
+          await _service.markApplicantsAsRead(item.id);
         }
 
         if (item.hasAssignedNotice) {
-          _seenAssignedNoticePostIds.add(item.id);
+          await _service.markAssignedNoticeAsRead(item.id);
         }
-      });
+      } catch (_) {}
 
       await _loadData();
     });
@@ -180,16 +173,15 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
   Future<void> _onAddCalendarPressed(ErrandManageItem item) async {
     try {
       await _service.addToCalendar(item);
+      await _service.markAssignedNoticeAsRead(item.id);
 
       if (!mounted) return;
-
-      setState(() {
-        _seenAssignedNoticePostIds.add(item.id);
-      });
 
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('일정에 추가되었습니다.')),
       );
+
+      await _loadData();
     } catch (e) {
       if (!mounted) return;
 
@@ -218,8 +210,8 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
 
     if (resolved == null) {
       return Container(
-        width: 86,
-        height: 86,
+        width: 92,
+        height: 92,
         color: const Color(0xFFEAEAEA),
       );
     }
@@ -228,13 +220,13 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
       borderRadius: BorderRadius.circular(2),
       child: Image.network(
         resolved,
-        width: 86,
-        height: 86,
+        width: 92,
+        height: 92,
         fit: BoxFit.cover,
         errorBuilder: (_, __, ___) {
           return Container(
-            width: 86,
-            height: 86,
+            width: 92,
+            height: 92,
             color: const Color(0xFFEAEAEA),
           );
         },
@@ -242,14 +234,27 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
     );
   }
 
-  Widget _buildRequestedCard(ErrandManageItem item) {
-    final isCompleted = item.status == 'COMPLETED';
-    final canComplete =
-        item.status == 'IN_PROGRESS' && item.assignedUserId != null;
+  Widget _buildStatusBadge() {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 3),
+      decoration: BoxDecoration(
+        color: const Color(0xFFF1F1F1),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: const Text(
+        '심부름 완료',
+        style: TextStyle(
+          fontSize: 12,
+          fontWeight: FontWeight.w800,
+          color: Color(0xFF777777),
+        ),
+      ),
+    );
+  }
 
-    final showApplicantNotice =
-        item.hasNewApplicantNotice &&
-        !_seenRequestedNoticePostIds.contains(item.id);
+  Widget _buildRequestedCard(ErrandManageItem item) {
+    final canComplete = item.isInProgress && item.assignedUserId != null;
+    final showApplicantNotice = item.hasNewApplicantNotice;
 
     return InkWell(
       onTap: () => _openPostDetail(item),
@@ -274,47 +279,77 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          item.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                          ),
+                        Row(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                  color: item.isCompleted
+                                      ? Colors.black.withOpacity(0.45)
+                                      : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            if (item.isCompleted) ...[
+                              const SizedBox(width: 6),
+                              _buildStatusBadge(),
+                            ],
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Text(
                           '${_formatCost(item.cost)}원/${_formatDeadline(item.deadline)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Colors.black87,
+                            color: item.isCompleted
+                                ? Colors.black.withOpacity(0.45)
+                                : Colors.black87,
                           ),
                         ),
                         const SizedBox(height: 6),
                         Row(
                           children: [
-                            const Icon(
+                            Icon(
                               Icons.person,
                               size: 16,
-                              color: Colors.blueGrey,
+                              color: item.isCompleted
+                                  ? Colors.blueGrey.withOpacity(0.45)
+                                  : Colors.blueGrey,
                             ),
                             const SizedBox(width: 2),
                             Text(
                               '${item.applicantCount}',
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: item.isCompleted
+                                    ? Colors.black.withOpacity(0.45)
+                                    : Colors.black87,
+                              ),
                             ),
                             const SizedBox(width: 10),
-                            const Icon(
-                              Icons.handshake,
-                              size: 16,
-                              color: Colors.blueGrey,
+                            Icon(
+                              Icons.chat_bubble_outline,
+                              size: 15,
+                              color: item.isCompleted
+                                  ? Colors.blueGrey.withOpacity(0.45)
+                                  : Colors.blueGrey,
                             ),
                             const SizedBox(width: 2),
                             Text(
                               item.assignedUserId == null ? '0' : '1',
-                              style: const TextStyle(fontSize: 13),
+                              style: TextStyle(
+                                fontSize: 13,
+                                color: item.isCompleted
+                                    ? Colors.black.withOpacity(0.45)
+                                    : Colors.black87,
+                              ),
                             ),
                           ],
                         ),
@@ -324,26 +359,8 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                 ),
               ],
             ),
-            const SizedBox(height: 8),
-            if (isCompleted)
-              Container(
-                width: double.infinity,
-                height: 34,
-                alignment: Alignment.center,
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF1F1F1),
-                  borderRadius: BorderRadius.circular(6),
-                ),
-                child: const Text(
-                  '심부름 완료',
-                  style: TextStyle(
-                    fontSize: 14,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-              )
-            else if (canComplete)
+            if (canComplete) ...[
+              const SizedBox(height: 8),
               SizedBox(
                 width: double.infinity,
                 height: 34,
@@ -359,16 +376,20 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                   ),
                   child: const Text(
                     '심부름 완료',
-                    style: TextStyle(fontSize: 14, fontWeight: FontWeight.w500),
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                    ),
                   ),
                 ),
               ),
+            ],
             if (showApplicantNotice) ...[
               const SizedBox(height: 8),
               Align(
                 alignment: Alignment.centerLeft,
                 child: Text(
-                  '새로운 신청자가 ${item.applicantCount}명 있어요!',
+                  '새로운 신청자가 ${item.unreadApplicantCount}명 있어요!',
                   style: const TextStyle(
                     color: Color(0xFFE53935),
                     fontSize: 14,
@@ -384,7 +405,7 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
   }
 
   Widget _buildAssignedCard(ErrandManageItem item) {
-    final showScheduleBanner = item.status == 'IN_PROGRESS';
+    final showScheduleBanner = item.hasAssignedNotice;
 
     return InkWell(
       onTap: () => _openPostDetail(item),
@@ -409,22 +430,46 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(
-                          item.title,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            height: 1.2,
-                          ),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                item.title,
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                                style: TextStyle(
+                                  fontSize: 15,
+                                  fontWeight: FontWeight.w700,
+                                  height: 1.25,
+                                  color: item.isCompleted
+                                      ? Colors.black.withOpacity(0.45)
+                                      : Colors.black87,
+                                ),
+                              ),
+                            ),
+                            if (item.isCompleted) ...[
+                              const SizedBox(width: 6),
+                              _buildStatusBadge(),
+                            ] else if (showScheduleBanner)
+                              Container(
+                                width: 8,
+                                height: 8,
+                                margin: const EdgeInsets.only(left: 6),
+                                decoration: const BoxDecoration(
+                                  color: Color(0xFFE57373),
+                                  shape: BoxShape.circle,
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 6),
                         Text(
                           '${_formatCost(item.cost)}원/${_formatDeadline(item.deadline)}',
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
-                            color: Colors.black87,
+                            color: item.isCompleted
+                                ? Colors.black.withOpacity(0.45)
+                                : Colors.black87,
                           ),
                         ),
                       ],
@@ -526,13 +571,13 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
         title: const Text(
           '내 심부름 관리',
           style: TextStyle(
-            fontSize: 28,
+            fontSize: 22,
             fontWeight: FontWeight.w700,
             color: Colors.black87,
           ),
         ),
         bottom: PreferredSize(
-          preferredSize: const Size.fromHeight(56),
+          preferredSize: const Size.fromHeight(52),
           child: Container(
             color: Colors.white,
             child: TabBar(
@@ -549,7 +594,7 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                       const Text(
                         '내가 부탁한 심부름',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -564,7 +609,7 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
                       const Text(
                         '내가 맡은 심부름',
                         style: TextStyle(
-                          fontSize: 17,
+                          fontSize: 15,
                           fontWeight: FontWeight.w600,
                         ),
                       ),
@@ -613,6 +658,12 @@ class _ReviewDialog extends StatefulWidget {
 class _ReviewDialogState extends State<_ReviewDialog> {
   int _rating = 3;
   final TextEditingController _controller = TextEditingController();
+
+  @override
+  void dispose() {
+    _controller.dispose();
+    super.dispose();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -669,13 +720,18 @@ class _ReviewDialogState extends State<_ReviewDialog> {
             Align(
               alignment: Alignment.centerRight,
               child: SizedBox(
-                width: 110,
-                height: 38,
+                width: 132,
+                height: 40,
                 child: OutlinedButton(
                   onPressed: () {
                     Navigator.pop(context, true);
                   },
-                  child: const Text('심부름 완료'),
+                  child: const Text(
+                    '심부름 완료',
+                    maxLines: 1,
+                    softWrap: false,
+                    overflow: TextOverflow.visible,
+                  ),
                 ),
               ),
             ),

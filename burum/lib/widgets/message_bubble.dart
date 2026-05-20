@@ -20,6 +20,26 @@ class MessageBubble extends StatelessWidget {
     this.onOtherUserTap,
   });
 
+  String buildImageUrl(String? rawUrl) {
+    if (rawUrl == null || rawUrl.trim().isEmpty) return '';
+
+    final url = rawUrl.trim();
+
+    if (url.startsWith('http://') || url.startsWith('https://')) {
+      return url;
+    }
+
+    final baseUrl = Config.baseUrl.endsWith('/')
+        ? Config.baseUrl.substring(0, Config.baseUrl.length - 1)
+        : Config.baseUrl;
+
+    if (url.startsWith('/')) {
+      return '$baseUrl$url';
+    }
+
+    return '$baseUrl/$url';
+  }
+
   void _openFullScreenImage(BuildContext context, String imageUrl) {
     Navigator.push(
       context,
@@ -30,36 +50,47 @@ class MessageBubble extends StatelessWidget {
   }
 
   Widget _buildImage(BuildContext context) {
-    final imageUrl = "$Config.baseUrl${message.imageUrl}";
+    final imageUrl = buildImageUrl(message.imageUrl);
 
     return GestureDetector(
-      onTap: () => _openFullScreenImage(context, imageUrl),
+      onTap: imageUrl.isEmpty ? null : () => _openFullScreenImage(context, imageUrl),
       child: Hero(
-        tag: imageUrl,
+        tag: imageUrl.isEmpty ? 'empty_image_${message.id}' : imageUrl,
         child: ClipRRect(
           borderRadius: BorderRadius.circular(12),
-          child: Image.network(
-            imageUrl,
-            width: 180,
-            fit: BoxFit.cover,
-            errorBuilder: (_, __, ___) => Container(
-              width: 180,
-              height: 140,
-              color: Colors.grey[300],
-              alignment: Alignment.center,
-              child: const Icon(Icons.broken_image_outlined),
-            ),
-          ),
+          child: imageUrl.isEmpty
+              ? Container(
+                  width: 180,
+                  height: 140,
+                  color: Colors.grey[300],
+                  alignment: Alignment.center,
+                  child: const Icon(Icons.broken_image_outlined),
+                )
+              : Image.network(
+                  imageUrl,
+                  width: 180,
+                  height: 140,
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => Container(
+                    width: 180,
+                    height: 140,
+                    color: Colors.grey[300],
+                    alignment: Alignment.center,
+                    child: const Icon(Icons.broken_image_outlined),
+                  ),
+                ),
         ),
       ),
     );
   }
 
   Widget _buildOtherAvatar() {
-    if (otherUserProfileImage != null && otherUserProfileImage!.isNotEmpty) {
+    final profileUrl = buildImageUrl(otherUserProfileImage);
+
+    if (profileUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 16,
-        backgroundImage: NetworkImage("$Config.baseUrl$otherUserProfileImage"),
+        backgroundImage: NetworkImage(profileUrl),
       );
     }
 

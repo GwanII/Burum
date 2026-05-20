@@ -12,6 +12,8 @@ class ErrandManageItem {
   final String location;
   final int? assignedUserId;
   final int applicantCount;
+  final int unreadApplicantCount;
+  final bool assignedNoticeRead;
   final String nickname;
   final List<String> tags;
 
@@ -27,6 +29,8 @@ class ErrandManageItem {
     required this.location,
     required this.assignedUserId,
     required this.applicantCount,
+    required this.unreadApplicantCount,
+    required this.assignedNoticeRead,
     required this.nickname,
     required this.tags,
   });
@@ -34,6 +38,7 @@ class ErrandManageItem {
   factory ErrandManageItem.fromJson(
     Map<String, dynamic> json, {
     int applicantCount = 0,
+    int unreadApplicantCount = 0,
   }) {
     return ErrandManageItem(
       id: _toInt(json['id']),
@@ -43,12 +48,14 @@ class ErrandManageItem {
       cost: _toInt(json['cost']),
       status: (json['status'] ?? 'WAITING').toString(),
       deadline: _parseDateTime(json['deadline']),
-      imageUrl: _parseNullableString(json['image_url']),
+      imageUrl: _parseImageUrl(json['image_url']),
       location: (json['location'] ?? '').toString(),
       assignedUserId: json['assigned_user_id'] == null
           ? null
           : _toInt(json['assigned_user_id']),
       applicantCount: applicantCount,
+      unreadApplicantCount: unreadApplicantCount,
+      assignedNoticeRead: _toBool(json['assigned_notice_read']),
       nickname: (json['nickname'] ??
               json['writerNickname'] ??
               json['writer_nickname'] ??
@@ -58,18 +65,36 @@ class ErrandManageItem {
     );
   }
 
+  bool get isWaiting => status == 'WAITING';
+  
+bool get isInProgress {
+  final s = status.trim().toUpperCase();
+  return s == 'MATCHED' || s == 'IN_PROGRESS';
+}
+
+bool get isCompleted {
+  final s = status.trim().toUpperCase();
+  return s == 'COMPLETE' || s == 'COMPLETED';
+}
   bool get hasNewApplicantNotice {
-    return status == 'WAITING' && applicantCount > 0;
+    return isWaiting && unreadApplicantCount > 0;
   }
 
   bool get hasAssignedNotice {
-    return status == 'IN_PROGRESS' && assignedUserId != null;
+    return isInProgress && assignedUserId != null && !assignedNoticeRead;
   }
 
   static int _toInt(dynamic value) {
     if (value == null) return 0;
     if (value is int) return value;
     return int.tryParse(value.toString()) ?? 0;
+  }
+
+  static bool _toBool(dynamic value) {
+    if (value == null) return false;
+    if (value is bool) return value;
+    if (value is int) return value == 1;
+    return value.toString() == '1' || value.toString().toLowerCase() == 'true';
   }
 
   static DateTime? _parseDateTime(dynamic value) {
@@ -81,10 +106,19 @@ class ErrandManageItem {
     }
   }
 
-  static String? _parseNullableString(dynamic value) {
+  static String? _parseImageUrl(dynamic value) {
     if (value == null) return null;
+
     final text = value.toString().trim();
     if (text.isEmpty || text.toLowerCase() == 'null') return null;
+
+    try {
+      final decoded = jsonDecode(text);
+      if (decoded is List && decoded.isNotEmpty) {
+        return decoded.first.toString();
+      }
+    } catch (_) {}
+
     return text;
   }
 

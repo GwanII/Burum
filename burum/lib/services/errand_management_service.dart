@@ -49,17 +49,33 @@ class ErrandManagementService {
         final postId = int.tryParse(map['id'].toString()) ?? 0;
 
         int applicantCount = 0;
+        int unreadApplicantCount = 0;
 
         try {
           final applicants = await getApplicants(postId);
           applicantCount = applicants.length;
+
+          unreadApplicantCount = applicants.where((applicant) {
+            if (applicant is! Map) return false;
+
+            final value = applicant['is_read_by_writer'];
+
+            if (value == null) return true;
+            if (value is int) return value == 0;
+            if (value is bool) return value == false;
+
+            return value.toString() == '0' ||
+                value.toString().toLowerCase() == 'false';
+          }).length;
         } catch (_) {
           applicantCount = 0;
+          unreadApplicantCount = 0;
         }
 
         return ErrandManageItem.fromJson(
           map,
           applicantCount: applicantCount,
+          unreadApplicantCount: unreadApplicantCount,
         );
       }),
     );
@@ -85,6 +101,7 @@ class ErrandManagementService {
       return ErrandManageItem.fromJson(
         Map<String, dynamic>.from(post as Map),
         applicantCount: 0,
+        unreadApplicantCount: 0,
       );
     }).toList();
 
@@ -92,28 +109,29 @@ class ErrandManagementService {
     return items;
   }
 
+  Future<void> markApplicantsAsRead(int postId) async {
+    await _dio.put('/api/createErrand/$postId/read-applicants');
+  }
+
+  Future<void> markAssignedNoticeAsRead(int postId) async {
+    await _dio.put('/api/createErrand/$postId/read-assigned');
+  }
+
   Future<void> completeErrand(int postId) async {
-    await _dio.put('/api/createErrand/$postId/complete');
+    await _dio.post('/api/createErrand/$postId/complete');
   }
 
   Future<void> addToCalendar(ErrandManageItem item) async {
-    final now = DateTime.now();
-    final scheduleDate = item.deadline ?? now.add(const Duration(hours: 1));
+  final scheduleDate = item.deadline ?? DateTime.now().add(const Duration(hours: 1));
 
-    await _dio.post(
-      '/api/calendar',
-      data: {
-        'title': item.title,
-        'content': item.content.isEmpty ? '심부름 일정' : item.content,
-        'location': item.location,
-        'color': '#FFF59D',
-        'alarm': '정각',
-        'schedules': [
-          {
-            'datetime': scheduleDate.toIso8601String(),
-          }
-        ],
-      },
-    );
-  }
+  await _dio.post(
+    '/api/calendar',
+    data: {
+      'applicantId': item.assignedUserId,
+      'title': item.title,
+      'deadline': scheduleDate.toIso8601String(),
+      'location': item.location,
+    },
+  );
+}
 }
