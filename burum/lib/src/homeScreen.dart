@@ -7,7 +7,8 @@ import 'mapScreen.dart';
 import 'myPageScreen.dart';
 import 'postDetailScreen.dart';
 import 'writerDetailPage.dart';
-// import '../config.dart'; // 🗑️ DioClient 내부에서 이미 BaseUrl을 쓰고 있으므로 여기선 필요 없음!
+import '../config.dart'; // 🗑️ DioClient 내부에서 이미 BaseUrl을 쓰고 있으므로 여기선 필요 없음!
+// ㄴ 사진 가져오기 위해 주석 풀었슴니다 --성빈 -성빈-
 import '../dio_client.dart'; // 🌟 우리의 행동대장 DioClient 호출!
 
 class HomeScreen extends StatefulWidget {
@@ -45,6 +46,30 @@ class _HomeScreenState extends State<HomeScreen> {
     super.dispose();
   }
 
+  // --성빈: 백엔드 사진 주소 포장지를 벗기고 서버 주소를 합쳐주는 마법 변환기 추가
+  String getRealImageUrl(String? rawImageUrl) {
+    if (rawImageUrl == null || rawImageUrl.isEmpty) return '';
+    String finalUrl = ''; // 🌟 완성된 주소를 담을 임시 바구니
+    try {
+      // 1. JSON 배열 포장지 ["/uploads/..."] 뜯기 시도!
+      List<dynamic> parsedList = jsonDecode(rawImageUrl);
+      if (parsedList.isNotEmpty) {
+        return '${Config.baseUrl}${parsedList[0]}'; // 서버 주소와 합체!
+      }
+    } catch (e) {
+      // 2. 포장지 없이 쌩얼로 왔을 때의 방어막!
+      if (rawImageUrl.startsWith('/uploads')) {
+        return '${Config.baseUrl}$rawImageUrl';
+      }
+      return rawImageUrl; // 이미 완성된 주소면 그대로 통과!
+    }
+    print('📸 [정찰병 보고] DB 원본: $rawImageUrl ➡️ 최종 출격 주소: $finalUrl');
+    return '';
+  }
+  // =========================================================================
+
+
+  
   // 🌟 변경 포인트 1: 닉네임 로드
   Future<void> _loadUserNickname() async {
     try {
@@ -299,6 +324,7 @@ class _HomeScreenState extends State<HomeScreen> {
         ),
       ),
       floatingActionButton: FloatingActionButton.extended(
+        heroTag: 'map_btn',
         onPressed: () {
           Navigator.push(
             context,
@@ -401,18 +427,25 @@ class _HomeScreenState extends State<HomeScreen> {
                 border: Border.all(color: Colors.grey.shade300),
               ),
               clipBehavior: Clip.hardEdge,
-              child: (imageUrl != null && imageUrl.isNotEmpty)
-                  ? Image.network(
-                      imageUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) =>
-                          const Icon(Icons.broken_image, color: Colors.grey),
-                    )
-                  : const Icon(
-                      Icons.image_not_supported_outlined,
-                      color: Colors.grey,
-                      size: 30,
-                    ),
+              // --성빈==========================================================
+              child: Hero(
+                tag: 'post_image_$postId', // 🌟 post['id']가 아니라 함수 파라미터인 postId 사용!
+                child: getRealImageUrl(imageUrl).isEmpty
+                    ? Container(color: const Color(0xFFFFF176)) 
+                    : Image.network(
+                        getRealImageUrl(imageUrl),
+                        fit: BoxFit.cover,
+                        width: double.infinity,
+                        height: double.infinity,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Image.network(
+                            'https://via.placeholder.com/300/FFF176/000000?text=No+Image',
+                            fit: BoxFit.cover,
+                          );
+                        },
+                      ),
+              ),
+              // ==================================================================
             ),
             const SizedBox(width: 15),
             // 텍스트 내용

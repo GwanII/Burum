@@ -31,7 +31,6 @@ class _MainScreenState extends State<MainScreen> {
     ChatListScreen(),
     const ErrandManagementScreen(), // 2번 탭 (임시)
     //    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
-    const CalendarScreen(), // 3번 탭 (임시)
     CalendarScreen(key: _calendarKey),
     const MyPageScreen(), // 4번 탭 (마이페이지)
   ];
