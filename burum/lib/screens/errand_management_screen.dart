@@ -25,12 +25,51 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
   List<ErrandManageItem> _requestedErrands = [];
   List<ErrandManageItem> _assignedErrands = [];
 
+  String _requestedFilter = 'ALL';
+  String _assignedFilter = 'ALL';
+
   bool get _hasRequestedNewNotice {
     return _requestedErrands.any((item) => item.hasNewApplicantNotice);
   }
 
   bool get _hasAssignedNewNotice {
     return _assignedErrands.any((item) => item.hasAssignedNotice);
+  }
+
+  List<ErrandManageItem> get _filteredRequestedErrands {
+    if (_requestedFilter == 'ALL') {
+      return _requestedErrands;
+    }
+
+    if (_requestedFilter == 'WAITING') {
+      return _requestedErrands.where((item) => item.isWaiting).toList();
+    }
+
+    if (_requestedFilter == 'IN_PROGRESS') {
+      return _requestedErrands.where((item) => item.isInProgress).toList();
+    }
+
+    if (_requestedFilter == 'COMPLETED') {
+      return _requestedErrands.where((item) => item.isCompleted).toList();
+    }
+
+    return _requestedErrands;
+  }
+
+  List<ErrandManageItem> get _filteredAssignedErrands {
+    if (_assignedFilter == 'ALL') {
+      return _assignedErrands;
+    }
+
+    if (_assignedFilter == 'IN_PROGRESS') {
+      return _assignedErrands.where((item) => !item.isCompleted).toList();
+    }
+
+    if (_assignedFilter == 'COMPLETED') {
+      return _assignedErrands.where((item) => item.isCompleted).toList();
+    }
+
+    return _assignedErrands;
   }
 
   @override
@@ -201,6 +240,100 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
       decoration: const BoxDecoration(
         color: Color(0xFFE57373),
         shape: BoxShape.circle,
+      ),
+    );
+  }
+
+  Widget _buildFilterButton({
+    required String label,
+    required bool selected,
+    required VoidCallback onTap,
+  }) {
+    return FilterChip(
+      label: Text(label),
+      selected: selected,
+      selectedColor: const Color(0xFFFFF78D),
+      checkmarkColor: Colors.black87,
+      backgroundColor: Colors.white,
+      side: BorderSide(
+        color: selected ? const Color(0xFFE6D95B) : Colors.grey.shade300,
+      ),
+      labelStyle: const TextStyle(
+        color: Colors.black87,
+        fontWeight: FontWeight.w600,
+      ),
+      onSelected: (_) => onTap(),
+    );
+  }
+
+  Widget _buildRequestedFilterButtons() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildFilterButton(
+                label: '전체',
+                selected: _requestedFilter == 'ALL',
+                onTap: () => setState(() => _requestedFilter = 'ALL'),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterButton(
+                label: '지원자 모집중',
+                selected: _requestedFilter == 'WAITING',
+                onTap: () => setState(() => _requestedFilter = 'WAITING'),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterButton(
+                label: '지원자 선택 완료',
+                selected: _requestedFilter == 'IN_PROGRESS',
+                onTap: () => setState(() => _requestedFilter = 'IN_PROGRESS'),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterButton(
+                label: '심부름 완료',
+                selected: _requestedFilter == 'COMPLETED',
+                onTap: () => setState(() => _requestedFilter = 'COMPLETED'),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAssignedFilterButtons() {
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(12, 12, 12, 4),
+      child: Center(
+        child: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              _buildFilterButton(
+                label: '전체',
+                selected: _assignedFilter == 'ALL',
+                onTap: () => setState(() => _assignedFilter = 'ALL'),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterButton(
+                label: '진행 중',
+                selected: _assignedFilter == 'IN_PROGRESS',
+                onTap: () => setState(() => _assignedFilter = 'IN_PROGRESS'),
+              ),
+              const SizedBox(width: 8),
+              _buildFilterButton(
+                label: '심부름 완료',
+                selected: _assignedFilter == 'COMPLETED',
+                onTap: () => setState(() => _assignedFilter = 'COMPLETED'),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -529,7 +662,7 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
 
     if (items.isEmpty) {
       return _buildEmptyView(
-        isRequestedTab ? '부탁한 심부름이 없어요.' : '맡은 심부름이 없어요.',
+        isRequestedTab ? '해당 상태의 부탁한 심부름이 없어요.' : '해당 상태의 맡은 심부름이 없어요.',
       );
     }
 
@@ -625,8 +758,22 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
       body: TabBarView(
         controller: _tabController,
         children: [
-          _buildList(_requestedErrands, true),
-          _buildList(_assignedErrands, false),
+          Column(
+            children: [
+              _buildRequestedFilterButtons(),
+              Expanded(
+                child: _buildList(_filteredRequestedErrands, true),
+              ),
+            ],
+          ),
+          Column(
+            children: [
+              _buildAssignedFilterButtons(),
+              Expanded(
+                child: _buildList(_filteredAssignedErrands, false),
+              ),
+            ],
+          ),
         ],
       ),
       floatingActionButton: FloatingActionButton.extended(

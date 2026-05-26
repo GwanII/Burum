@@ -28,7 +28,7 @@ class _ProfileDetailScreenState extends State<ProfileDetailScreen> {
   Future<void> fetchProfile() async {
     try {
       final response = await http.get(
-        Uri.parse("${Config.baseUrl}api/users/profile/${widget.userId}"),
+        Uri.parse("${Config.baseUrl}/api/users/profile/${widget.userId}"),
       );
 
       if (response.statusCode == 200) {
