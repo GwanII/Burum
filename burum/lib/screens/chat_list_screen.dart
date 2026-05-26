@@ -80,81 +80,83 @@ class _ChatListScreenState extends State<ChatListScreen> {
     super.dispose();
   }
 
-    Future<void> fetchChatRooms({bool showLoading = true}) async {
-  if (currentUserId == null) return;
+  Future<void> fetchChatRooms({bool showLoading = true}) async {
+    if (currentUserId == null) return;
 
-  if (showLoading && mounted) {
-    setState(() {
-      isLoading = true;
-    });
-  }
-
-  try {
-    final url = "${Config.baseUrl}/api/chat/rooms/$currentUserId";
-    print('채팅방 조회 URL = $url');
-
-    final response = await http.get(Uri.parse(url));
-
-    print('응답 상태코드 = ${response.statusCode}');
-    print('응답 headers = ${response.headers}');
-    print('응답 body = ${response.body}');
-
-    if (response.statusCode != 200) {
-      if (!mounted) return;
+    if (showLoading && mounted) {
       setState(() {
-        isLoading = false;
+        isLoading = true;
       });
-      return;
     }
 
-    final contentType = response.headers['content-type'] ?? '';
-    if (!contentType.contains('application/json')) {
-      print('JSON 아님! content-type = $contentType');
-      if (!mounted) return;
-      setState(() {
-        isLoading = false;
-      });
-      return;
-    }
+    try {
+      final url = "${Config.baseUrl}/api/chat/rooms/$currentUserId";
+      print('채팅방 조회 URL = $url');
 
-    final List data = jsonDecode(response.body);
-    final rooms = data.map((json) => ChatRoom.fromJson(json)).toList();
+      final response = await http.get(Uri.parse(url));
 
-    rooms.sort((a, b) {
-      if (a.isPinned != b.isPinned) {
-        return a.isPinned ? -1 : 1;
+      print('응답 상태코드 = ${response.statusCode}');
+      print('응답 headers = ${response.headers}');
+      print('응답 body = ${response.body}');
+
+      if (response.statusCode != 200) {
+        if (!mounted) return;
+        setState(() {
+          isLoading = false;
+        });
+        return;
       }
 
-      final aTime = DateTime.tryParse(a.lastMessageTime ?? '');
-      final bTime = DateTime.tryParse(b.lastMessageTime ?? '');
+      final contentType = response.headers['content-type'] ?? '';
+      if (!contentType.contains('application/json')) {
+        print('JSON 아님! content-type = $contentType');
+        if (!mounted) return;
+        setState(() {
+          isLoading = false;
+        });
+        return;
+      }
 
-      if (aTime == null && bTime == null) return 0;
-      if (aTime == null) return 1;
-      if (bTime == null) return -1;
+      final List data = jsonDecode(response.body);
+      final rooms = data.map((json) => ChatRoom.fromJson(json)).toList();
 
-      return bTime.compareTo(aTime);
-    });
+      rooms.sort((a, b) {
+        if (a.isPinned != b.isPinned) {
+          return a.isPinned ? -1 : 1;
+        }
 
-    if (!mounted) return;
+        final aTime = DateTime.tryParse(a.lastMessageTime ?? '');
+        final bTime = DateTime.tryParse(b.lastMessageTime ?? '');
 
-    setState(() {
-      chatRooms = rooms;
-      isLoading = false;
-    });
-  } catch (e) {
-    debugPrint('fetchChatRooms error: $e');
-    if (!mounted) return;
-    setState(() {
-      isLoading = false;
-    });
+        if (aTime == null && bTime == null) return 0;
+        if (aTime == null) return 1;
+        if (bTime == null) return -1;
+
+        return bTime.compareTo(aTime);
+      });
+
+      if (!mounted) return;
+
+      setState(() {
+        chatRooms = rooms;
+        isLoading = false;
+      });
+    } catch (e) {
+      debugPrint('fetchChatRooms error: $e');
+      if (!mounted) return;
+      setState(() {
+        isLoading = false;
+      });
+    }
   }
-}
 
   Future<void> leaveRoom(int roomId) async {
     if (currentUserId == null) return;
 
     await http.delete(
-      Uri.parse("${Config.baseUrl}/api/chat/rooms/$roomId?userId=$currentUserId"),
+      Uri.parse(
+        "${Config.baseUrl}/api/chat/rooms/$roomId?userId=$currentUserId",
+      ),
     );
     await fetchChatRooms(showLoading: false);
   }
@@ -165,10 +167,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     await http.post(
       Uri.parse("${Config.baseUrl}/api/chat/read"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "roomId": roomId,
-        "userId": currentUserId,
-      }),
+      body: jsonEncode({"roomId": roomId, "userId": currentUserId}),
     );
     await fetchChatRooms(showLoading: false);
   }
@@ -179,10 +178,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
     await http.patch(
       Uri.parse("${Config.baseUrl}/api/chat/rooms/${room.roomId}/pin"),
       headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "userId": currentUserId,
-        "isPinned": !room.isPinned,
-      }),
+      body: jsonEncode({"userId": currentUserId, "isPinned": !room.isPinned}),
     );
     await fetchChatRooms(showLoading: false);
   }
@@ -260,16 +256,12 @@ class _ChatListScreenState extends State<ChatListScreen> {
         : chatRooms;
 
     if (isLoading) {
-      return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
-      );
+      return const Scaffold(body: Center(child: CircularProgressIndicator()));
     }
 
     if (currentUserId == null) {
       return const Scaffold(
-        body: Center(
-          child: Text('로그인 사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.'),
-        ),
+        body: Center(child: Text('로그인 사용자 정보를 찾을 수 없습니다. 다시 로그인해주세요.')),
       );
     }
 
@@ -281,10 +273,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
         centerTitle: true,
         title: const Text(
           "채팅",
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.black87,
-          ),
+          style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black87),
         ),
       ),
       body: RefreshIndicator(
@@ -323,9 +312,7 @@ class _ChatListScreenState extends State<ChatListScreen> {
                   const SizedBox(height: 180),
                   Center(
                     child: Text(
-                      showUnreadOnly
-                          ? "안 읽은 채팅이 없습니다."
-                          : "채팅방이 없습니다.",
+                      showUnreadOnly ? "안 읽은 채팅이 없습니다." : "채팅방이 없습니다.",
                       style: const TextStyle(fontSize: 16),
                     ),
                   ),
