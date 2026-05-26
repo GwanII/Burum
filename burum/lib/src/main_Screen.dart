@@ -1,4 +1,3 @@
-import 'package:burum/src/createErrandScreen.dart';
 import 'package:flutter/material.dart';
 import 'homeScreen.dart';
 import 'myPageScreen.dart';
@@ -18,30 +17,37 @@ class _MainScreenState extends State<MainScreen> {
   // 1. 현재 선택된 탭 번호 (처음엔 0번인 '홈'으로 시작)
   int _selectedIndex = 0;
 
-  // 캘린더 화면 새로고침하기 위해서.
+  // 🌟 화면 새로고침을 위한 Key 들
+  // 탭을 다시 누를 때마다 UniqueKey()를 갱신하여 강제로 DB를 새로고침하게 만듭니다.
+  Key _homeKey = UniqueKey();
+  Key _errandKey = UniqueKey();
   Key _calendarKey = UniqueKey();
+  Key _myPageKey = UniqueKey();
 
   // 2. 탭을 누를 때마다 보여줄 알맹이 화면들 리스트!
-  // (나중에 채팅, 심부름, 캘린더 화면을 만들면 여기에 쏙쏙 넣으시면 됩니다)
-
-  //final List<Widget> _screens = [
-  // ㄴ 원래 이거였는데 캘린더 새로고침 때문에 밑에 get => 로 바꿧음.
   List<Widget> get _screens => [
-    const HomeScreen(),
-    ChatListScreen(),
-    const ErrandManagementScreen(), // 2번 탭 (임시)
-    //    const Center(child: Text('심부름 화면 (준비중)')), // 2번 탭 (임시)
-    CalendarScreen(key: _calendarKey),
-    const MyPageScreen(), // 4번 탭 (마이페이지)
+    HomeScreen(key: _homeKey), // 0번 탭 (홈)
+    ChatListScreen(), // 1번 탭 (채팅)
+    ErrandManagementScreen(key: _errandKey), // 2번 탭 (심부름)
+    CalendarScreen(key: _calendarKey), // 3번 탭 (캘린더)
+    MyPageScreen(key: _myPageKey), // 4번 탭 (마이페이지)
   ];
 
   // 3. 탭을 클릭했을 때 실행되는 함수
   void _onItemTapped(int index) {
     setState(() {
       _selectedIndex = index;
-      if (index == 3) {
+
+      // 🌟 핵심: 탭을 누를 때마다 해당 탭의 Key를 갱신하여 화면을 완전히 새로 그립니다!
+      if (index == 0) {
+        _homeKey = UniqueKey();
+      } else if (index == 2) {
+        _errandKey = UniqueKey();
+      } else if (index == 3) {
         _calendarKey = UniqueKey();
-      } // 번호만 싹 바꿔줍니다
+      } else if (index == 4) {
+        _myPageKey = UniqueKey();
+      }
     });
   }
 
