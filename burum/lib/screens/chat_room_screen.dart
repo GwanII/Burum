@@ -12,6 +12,7 @@ import '../services/socket_service.dart';
 import '../widgets/message_bubble.dart';
 import 'profile_detail_screen.dart';
 import '../src/postDetailScreen.dart';
+import '../src/writerDetailPage.dart';
 
 class ChatRoomScreen extends StatefulWidget {
   final ChatRoom room;
@@ -96,9 +97,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => ProfileDetailScreen(
-          userId: widget.room.otherUserId,
-        ),
+        builder: (_) => ProfileDetailScreen(userId: widget.room.otherUserId),
       ),
     );
   }
@@ -132,98 +131,99 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   Future<void> fetchMessages({bool refreshOnly = false}) async {
-  if (isFetchingMessages) return;
+    if (isFetchingMessages) return;
 
-  isFetchingMessages = true;
+    isFetchingMessages = true;
 
-  try {
-    final url = "${Config.baseUrl}api/chat/messages/${widget.room.roomId}";
-    print("메시지 조회 URL = $url"); // [추가] 실제 요청 주소 확인
+    try {
+      final url = "${Config.baseUrl}/api/chat/messages/${widget.room.roomId}";
+      print("메시지 조회 URL = $url"); // [추가] 실제 요청 주소 확인
 
-    final response = await http.get(Uri.parse(url));
+      final response = await http.get(Uri.parse(url));
 
-    print("메시지 조회 상태코드 = ${response.statusCode}"); // [추가]
-    print("메시지 조회 headers = ${response.headers}"); // [추가]
-    print("메시지 조회 body = ${response.body}"); // [추가]
+      print("메시지 조회 상태코드 = ${response.statusCode}"); // [추가]
+      print("메시지 조회 headers = ${response.headers}"); // [추가]
+      print("메시지 조회 body = ${response.body}"); // [추가]
 
-    if (response.statusCode == 200) {
-      final List data = jsonDecode(response.body);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
 
-      if (!mounted) return;
+        if (!mounted) return;
 
-      final fetchedMessages =
-          data.map((json) => Message.fromJson(json)).toList();
+        final fetchedMessages = data
+            .map((json) => Message.fromJson(json))
+            .toList();
 
-      setState(() {
-        messages = fetchedMessages;
-      });
+        setState(() {
+          messages = fetchedMessages;
+        });
 
-      if (!refreshOnly) {
-        WidgetsBinding.instance.addPostFrameCallback((_) async {
-          await _scrollToBottom(animated: true);
+        if (!refreshOnly) {
+          WidgetsBinding.instance.addPostFrameCallback((_) async {
+            await _scrollToBottom(animated: true);
+          });
+        }
+      } else {
+        debugPrint("fetchMessages failed: ${response.body}");
+      }
+    } catch (e) {
+      debugPrint("fetchMessages error: $e");
+    } finally {
+      isFetchingMessages = false;
+    }
+  }
+
+  Future<void> sendMessage() async {
+    if (controller.text.trim().isEmpty || isSending) return;
+
+    final content = controller.text.trim();
+
+    setState(() {
+      isSending = true;
+    });
+
+    try {
+      final url = "${Config.baseUrl}/api/chat/message";
+      print("메시지 전송 URL = $url"); // [추가]
+
+      final response = await http.post(
+        Uri.parse(url),
+        headers: {"Content-Type": "application/json"},
+        body: jsonEncode({
+          "chatRoomId": widget.room.roomId,
+          "senderId": widget.currentUserId,
+          "content": content,
+        }),
+      );
+
+      print("메시지 전송 상태코드 = ${response.statusCode}"); // [추가]
+      print("메시지 전송 body = ${response.body}"); // [추가]
+
+      if (response.statusCode == 200) {
+        controller.clear();
+      } else {
+        debugPrint("sendMessage failed: ${response.body}");
+        if (mounted) {
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('메시지 전송에 실패했습니다.')));
+        }
+      }
+    } catch (e) {
+      debugPrint("sendMessage error: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')));
+      }
+    } finally {
+      if (mounted) {
+        setState(() {
+          isSending = false;
         });
       }
-    } else {
-      debugPrint("fetchMessages failed: ${response.body}");
-    }
-  } catch (e) {
-    debugPrint("fetchMessages error: $e");
-  } finally {
-    isFetchingMessages = false;
-  }
-}
-
- Future<void> sendMessage() async {
-  if (controller.text.trim().isEmpty || isSending) return;
-
-  final content = controller.text.trim();
-
-  setState(() {
-    isSending = true;
-  });
-
-  try {
-    final url = "${Config.baseUrl}api/chat/message";
-    print("메시지 전송 URL = $url"); // [추가]
-
-    final response = await http.post(
-      Uri.parse(url),
-      headers: {"Content-Type": "application/json"},
-      body: jsonEncode({
-        "chatRoomId": widget.room.roomId,
-        "senderId": widget.currentUserId,
-        "content": content,
-      }),
-    );
-
-    print("메시지 전송 상태코드 = ${response.statusCode}"); // [추가]
-    print("메시지 전송 body = ${response.body}"); // [추가]
-
-    if (response.statusCode == 200) {
-      controller.clear();
-    } else {
-      debugPrint("sendMessage failed: ${response.body}");
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('메시지 전송에 실패했습니다.')),
-        );
-      }
-    }
-  } catch (e) {
-    debugPrint("sendMessage error: $e");
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('메시지 전송 중 오류가 발생했습니다.')),
-      );
-    }
-  } finally {
-    if (mounted) {
-      setState(() {
-        isSending = false;
-      });
     }
   }
-}
 
   Future<void> pickAndSendImage() async {
     if (isUploadingImage) return;
@@ -241,9 +241,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
       if (bytes == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지 데이터를 불러오지 못했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('이미지 데이터를 불러오지 못했습니다.')));
         }
         return;
       }
@@ -252,19 +252,22 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         isUploadingImage = true;
       });
 
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse("${Config.baseUrl}api/chat/image"),
-      )
-        ..fields['chatRoomId'] = widget.room.roomId.toString()
-        ..fields['senderId'] = widget.currentUserId.toString()
-        ..files.add(
-          http.MultipartFile.fromBytes(
-            'image',
-            bytes,
-            filename: pickedFile.name.isNotEmpty ? pickedFile.name : 'image.jpg',
-          ),
-        );
+      final request =
+          http.MultipartRequest(
+              'POST',
+              Uri.parse("${Config.baseUrl}/api/chat/image"),
+            )
+            ..fields['chatRoomId'] = widget.room.roomId.toString()
+            ..fields['senderId'] = widget.currentUserId.toString()
+            ..files.add(
+              http.MultipartFile.fromBytes(
+                'image',
+                bytes,
+                filename: pickedFile.name.isNotEmpty
+                    ? pickedFile.name
+                    : 'image.jpg',
+              ),
+            );
 
       final streamedResponse = await request.send();
       final response = await http.Response.fromStream(streamedResponse);
@@ -272,17 +275,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
       if (response.statusCode != 200) {
         debugPrint('image upload failed: ${response.body}');
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('이미지 전송에 실패했습니다.')),
-          );
+          ScaffoldMessenger.of(
+            context,
+          ).showSnackBar(const SnackBar(content: Text('이미지 전송에 실패했습니다.')));
         }
       }
     } catch (e) {
       debugPrint('pickAndSendImage error: $e');
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('이미지 업로드 중 오류가 발생했습니다.')),
-        );
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(const SnackBar(content: Text('이미지 업로드 중 오류가 발생했습니다.')));
       }
     } finally {
       if (mounted) {
@@ -296,7 +299,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Future<void> markAsRead() async {
     try {
       await http.post(
-        Uri.parse("${Config.baseUrl}api/chat/read"),
+        Uri.parse("${Config.baseUrl}/api/chat/read"),
         headers: {"Content-Type": "application/json"},
         body: jsonEncode({
           "roomId": widget.room.roomId,
@@ -309,17 +312,17 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   }
 
   String formatDeadlineForPostDetail(String? rawDate) {
-  if (rawDate == null || rawDate.trim().isEmpty) return '';
+    if (rawDate == null || rawDate.trim().isEmpty) return '';
 
-  final parsed = DateTime.tryParse(rawDate);
-  if (parsed == null) return rawDate;
+    final parsed = DateTime.tryParse(rawDate);
+    if (parsed == null) return rawDate;
 
-  final local = parsed.toLocal();
-  final hour = local.hour.toString().padLeft(2, '0');
-  final minute = local.minute.toString().padLeft(2, '0');
+    final local = parsed.toLocal();
+    final hour = local.hour.toString().padLeft(2, '0');
+    final minute = local.minute.toString().padLeft(2, '0');
 
-  return '${local.month}/${local.day} $hour:$minute 마감';
-}
+    return '${local.month}/${local.day} $hour:$minute 마감';
+  }
 
   String formatTime(DateTime time) {
     final local = time.toLocal();
@@ -377,23 +380,59 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
 
     return GestureDetector(
       onTap: () {
-        Navigator.push(
-          context,
-          MaterialPageRoute(
-            builder: (_) => PostDetailScreen(
-              postId: widget.room.postId.toString(),
-              currentUserId: widget.currentUserId.toString(),
-              writerId: widget.room.postWriterId.toString(),
-              title: widget.room.postTitle ?? '게시물 정보 없음',
-              content: widget.room.postContent ?? '내용 없음',
-              price: '${widget.room.postCost ?? 0}',
-              date: formatDeadlineForPostDetail(widget.room.postDeadline),
-              nickname: widget.room.postWriterNickname ?? widget.room.otherUserNickname,
-              tags: widget.room.postTags,
-              imageUrl: widget.room.postImage,
-),
-          ),
+        // 🌟 홈 화면과 동일한 역할: 현재 유저가 게시글 작성자인지 ID로 확인합니다.
+        final bool isWriter = widget.currentUserId == widget.room.postWriterId;
+
+        // 공통으로 사용할 데이터 변수 정리
+        final String postId = widget.room.postId.toString();
+        final String title = widget.room.postTitle ?? '게시물 정보 없음';
+        final String desc = widget.room.postContent ?? '내용 없음';
+        final String price = '${widget.room.postCost ?? 0}';
+        final String deadlineInfo = formatDeadlineForPostDetail(
+          widget.room.postDeadline,
         );
+        final String nickname =
+            widget.room.postWriterNickname ?? widget.room.otherUserNickname;
+        final dynamic tags = widget.room.postTags;
+        final String? imageUrl = widget.room.postImage;
+
+        if (isWriter) {
+          // ⭕ 내가 작성자일 때: 홈 화면 로직 그대로 writerDetailPage로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => writerDetailPage(
+                postId: postId,
+                title: title,
+                content: desc,
+                price: price,
+                date: deadlineInfo,
+                nickname: nickname,
+                tags: tags,
+                imageUrl: imageUrl,
+              ),
+            ),
+          );
+        } else {
+          // ⭕ 내가 작성자가 아닐 때: 홈 화면 로직 그대로 PostDetailScreen으로 이동
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (context) => PostDetailScreen(
+                postId: postId,
+                title: title,
+                content: desc,
+                currentUserId: widget.currentUserId.toString(),
+                writerId: widget.room.postWriterId.toString(),
+                price: price,
+                date: deadlineInfo,
+                nickname: nickname,
+                tags: tags,
+                imageUrl: imageUrl,
+              ),
+            ),
+          );
+        }
       },
       child: Container(
         margin: const EdgeInsets.fromLTRB(12, 12, 12, 4),
@@ -414,7 +453,8 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           children: [
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
-              child: widget.room.postImage != null &&
+              child:
+                  widget.room.postImage != null &&
                       widget.room.postImage!.isNotEmpty
                   ? Image.network(
                       "$Config.baseUrl${widget.room.postImage}",
@@ -461,10 +501,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                   const SizedBox(height: 4),
                   Text(
                     "비용: ${widget.room.postCost ?? 0}원",
-                    style: const TextStyle(
-                      fontSize: 13,
-                      color: Colors.black54,
-                    ),
+                    style: const TextStyle(fontSize: 13, color: Colors.black54),
                   ),
                 ],
               ),
@@ -535,9 +572,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
           buildPostCard(),
           Expanded(
             child: messages.isEmpty
-                ? const Center(
-                    child: Text("아직 메시지가 없습니다."),
-                  )
+                ? const Center(child: Text("아직 메시지가 없습니다."))
                 : ListView.builder(
                     controller: scrollController,
                     padding: const EdgeInsets.symmetric(vertical: 8),
@@ -568,9 +603,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
               padding: const EdgeInsets.fromLTRB(8, 8, 8, 10),
               decoration: BoxDecoration(
                 color: Colors.white,
-                border: Border(
-                  top: BorderSide(color: Colors.grey.shade200),
-                ),
+                border: Border(top: BorderSide(color: Colors.grey.shade200)),
               ),
               child: Row(
                 children: [
