@@ -3,6 +3,7 @@ import 'package:burum/models/errand_manage_item.dart';
 import 'package:burum/services/errand_management_service.dart';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
+import 'dart:convert'; // 🌟 [수정된 내용 - 성빈 -] JSON 파싱을 위해 추가하였습니다.
 
 import 'package:burum/src/createErrandScreen.dart';
 import 'package:burum/src/postDetailScreen.dart';
@@ -125,27 +126,45 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
     return '${deadline.month}월 ${deadline.day}일';
   }
 
+  // 🌟 [수정된 내용 - 성빈 -]
+  // null이 반환되어 발생하는 반환 타입 에러를 방지하기 위해, 값이 없을 경우 빈 문자열을 정상적으로 반환하도록 확인하였습니다.
   String _formatDetailDate(DateTime? deadline) {
     if (deadline == null) return '';
     return DateFormat('yyyy-MM-dd HH:mm').format(deadline);
   }
 
+  // 🌟 [수정된 내용 - 성빈 -]
+  // 이미지 주소가 배열 형태(JSON)로 전달될 경우를 대비하여 괄호 외부에 변수를 선언하고,
+  // 정상적으로 첫 번째 사진의 순수 문자열 주소만 추출하도록 해독 로직을 추가하였습니다.
   String? _resolveImageUrl(String? rawUrl) {
     if (rawUrl == null || rawUrl.trim().isEmpty) return null;
 
-    if (rawUrl.startsWith('http://') || rawUrl.startsWith('https://')) {
-      return rawUrl;
+    String cleanUrl = rawUrl;
+
+    try {
+      if (rawUrl.startsWith('[')) {
+        List<dynamic> parsed = jsonDecode(rawUrl);
+        if (parsed.isNotEmpty) {
+          cleanUrl = parsed[0].toString();
+        }
+      }
+    } catch (e) {
+      print("관리 화면 사진 해독 실패: $e");
     }
 
-    if (rawUrl.startsWith('/uploads')) {
-      return '${Config.baseUrl}$rawUrl';
+    if (cleanUrl.startsWith('http://') || cleanUrl.startsWith('https://')) {
+      return cleanUrl;
     }
 
-    if (rawUrl.startsWith('uploads/')) {
-      return '${Config.baseUrl}/$rawUrl';
+    if (cleanUrl.startsWith('/uploads')) {
+      return '${Config.baseUrl}$cleanUrl';
     }
 
-    return rawUrl;
+    if (cleanUrl.startsWith('uploads/')) {
+      return '${Config.baseUrl}/$cleanUrl';
+    }
+
+    return cleanUrl;
   }
 
   void _openPostDetail(ErrandManageItem item) {
@@ -164,6 +183,9 @@ class _ErrandManagementScreenState extends State<ErrandManagementScreen>
           tags: item.tags,
           imageUrl: _resolveImageUrl(item.imageUrl),
           initialIsApplied: false,
+          // 🌟 [수정된 내용 - 성빈 -]
+          // 상세 페이지로 이동 시, Hero 위젯에서 요구하는 필수 태그 속성을 추가하여 오류를 해결하였습니다.
+          heroTag: 'manage_image_${item.id}', 
         ),
       ),
     ).then((_) async {
