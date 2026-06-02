@@ -26,6 +26,53 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _loadingType = '';
 
+
+  Future<void> _login() async {
+    final String email = _emailController.text.trim();
+    final String password = _passwordController.text.trim();
+
+    if (email.isEmpty || password.isEmpty) {
+      _showMessage('아이디(이메일)와 비밀번호를 모두 입력해주세요.');
+      return;
+    }
+
+    setState(() {
+      _loadingType = 'normal';
+    });
+
+    try {
+      print("==== 로그인 시작 ====");
+
+      final response = await DioClient.instance.post(
+        '/api/users/login',
+        data: {
+          'email': email,
+          'password': password,
+          'autoLogin': _isAutoLogin,
+        },
+      );
+
+      print("==== 서버 응답 성공 ====");
+      print(response.data);
+
+      await _handleLoginSuccess(response.data);
+
+      print("==== 로그인 처리 완료 ====");
+    } catch (e, st) {
+      print("==== 로그인 에러 ====");
+      print(e);
+      print(st);
+    } finally {
+      if (mounted) {
+        setState(() {
+          _loadingType = '';
+        });
+      }
+    }
+  }
+
+
+  /*
   // 백엔드 API 호출 로직
   Future<void> _login() async {
     final String email = _emailController.text.trim();
@@ -63,6 +110,9 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
+  */
+
+
 
   // 구글 로그인 객체 생성
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
@@ -212,6 +262,17 @@ class _LoginScreenState extends State<LoginScreen> {
 
   // 로그인 성공 후 공통 처리 로직 (토큰 저장 및 화면 이동)
   Future<void> _handleLoginSuccess(Map<String, dynamic> responseData) async {
+    print("==== 응답 데이터 ====");
+    print(responseData);
+
+    print("accessToken:");
+    print(responseData['accessToken']);
+
+    print("refreshToken:");
+    print(responseData['refreshToken']);
+
+    print("nickname:");
+    print(responseData['nickname']);  
     final accessToken = responseData['accessToken'];
     final refreshToken = responseData['refreshToken'];
     final nickname = responseData['nickname'] ?? '익명';
@@ -235,11 +296,24 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     // 다은 작업 **채팅 화면에서 현재 로그인한 유저를 구분하기 위해 userId 저장
+
+    /*
     final userId =
         responseData['userId'] ??
         responseData['id'] ??
         (responseData['user'] != null ? responseData['user']['id'] : null);
+    */
+    dynamic userId;
+    if (responseData['userId'] != null) {
+      userId = responseData['userId'];
+    } else if (responseData['id'] != null) {
+      userId = responseData['id'];
+    } else if (responseData['user'] is Map) {
+      userId = responseData['user']['id'];
+    }
+//===================================
 
+print("userId = $userId");
     if (userId != null) {
       await storage.write(key: 'userId', value: userId.toString());
     }
