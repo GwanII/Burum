@@ -65,6 +65,7 @@ class _MapScreenState extends State<MapScreen> {
               snippet: '💰 수당: $cost원 ($locationName)',
 
               // 🔥 [궁극의 연계 마법] 말풍선을 딱! 누르면 해당 심부름 상세 페이지로 순간이동!!!!!
+              
               onTap: () {
                 List<String> parsedTags = [];
                 try {
@@ -75,6 +76,18 @@ class _MapScreenState extends State<MapScreen> {
                   }
                 } catch (e) {
                   print("태그 파싱 실패: $e");
+                }
+
+                String? displayImageUrl;
+                if (post['image_url'] != null && post['image_url'].toString().isNotEmpty) {
+                  try {
+                    List<dynamic> imageUrls = jsonDecode(post['image_url']);
+                    if (imageUrls.isNotEmpty) {
+                      displayImageUrl = imageUrls[0]; // 첫 번째 사진만 쏙 빼기!
+                    }
+                  } catch (e) {
+                    print('지도 핑 사진 해독 실패!: $e');
+                  }
                 }
 
                 Navigator.push(
@@ -90,7 +103,8 @@ class _MapScreenState extends State<MapScreen> {
                       date: post['deadline'] ?? '마감일 없음',
                       nickname: post['nickname'] ?? '익명 대장',
                       tags: parsedTags,
-                      imageUrl: post['image_url'],
+                      imageUrl: displayImageUrl, 
+                      heroTag: 'map_image_$postId',
                     ),
                   ),
                 );

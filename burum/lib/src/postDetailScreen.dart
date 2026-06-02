@@ -21,6 +21,7 @@ class PostDetailScreen extends StatefulWidget {
   final String nickname;
   final List<String> tags;
   final String? imageUrl;
+  final String heroTag;
 
   // 💡 홈 화면에서 이 게시물에 이미 지원했는지 여부를 넘겨받으면 좋습니다.
   // 기본값은 false로 설정했습니다.
@@ -38,6 +39,7 @@ class PostDetailScreen extends StatefulWidget {
     required this.nickname,
     required this.tags,
     this.imageUrl,
+    required this.heroTag,
     this.initialIsApplied = false, // 기본값 false
   });
 
@@ -312,7 +314,10 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               width: double.infinity,
               color: Colors.grey.shade300,
               child: (widget.imageUrl != null && widget.imageUrl!.isNotEmpty)
-                  ? Image.network(widget.imageUrl!, fit: BoxFit.cover)
+                  ? Hero(
+                    tag: widget.heroTag,
+                    child: Image.network(widget.imageUrl!, fit: BoxFit.cover),
+                  )
                   : const Icon(
                       Icons.image_not_supported,
                       size: 50,

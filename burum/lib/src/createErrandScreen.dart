@@ -209,11 +209,21 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       'longitude': _selectedLatLng.longitude.toStringAsFixed(8),
       'cost': rawCost.isEmpty ? '0' : rawCost,
       'tags': jsonEncode(_tags),
-      'image_url': "", 
     };
 
     if (_dateController.text.isNotEmpty) {
       formDataMap['deadline'] = _dateController.text;
+    }
+
+    if (_selectedImages.isNotEmpty) {
+      List<MultipartFile> multipartImages = [];
+      for (var file in _selectedImages) {
+        multipartImages.add(
+          await MultipartFile.fromFile(file.path, filename: file.name)
+        );
+      }
+      // 백엔드 라우터(upload.array('images'))가 기다리는 정확한 이름표 'images'를 붙여주오!
+      formDataMap['images'] = multipartImages;
     }
 
     FormData formData = FormData.fromMap(formDataMap);

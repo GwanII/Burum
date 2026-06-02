@@ -378,6 +378,23 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
   Widget buildPostCard() {
     if (!hasPostPreview) return const SizedBox.shrink();
 
+    // 🌟🌟🌟 [수정된 내용 - 성빈 -] 🌟🌟🌟
+    // UI 렌더링 부분과 onTap(클릭) 이벤트 양쪽 모두에서 cleanImageUrl 변수에 접근할 수 있도록,
+    // 변수 선언과 해독 로직을 함수 최상단(공통 범위)으로 끌어올렸습니다.
+    String? cleanImageUrl = widget.room.postImage;
+    if (cleanImageUrl != null && cleanImageUrl.isNotEmpty) {
+      try {
+        if (cleanImageUrl.startsWith('[')) {
+          List<dynamic> parsed = jsonDecode(cleanImageUrl);
+          if (parsed.isNotEmpty) {
+            cleanImageUrl = parsed[0].toString();
+          }
+        }
+      } catch (e) {
+        print("채팅방 사진 해독 실패: $e");
+      }
+    }
+
     return GestureDetector(
       onTap: () {
         // 🌟 홈 화면과 동일한 역할: 현재 유저가 게시글 작성자인지 ID로 확인합니다.
@@ -394,7 +411,9 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
         final String nickname =
             widget.room.postWriterNickname ?? widget.room.otherUserNickname;
         final dynamic tags = widget.room.postTags;
-        final String? imageUrl = widget.room.postImage;
+        
+        // 함수 최상단에서 해독한 주소를 그대로 사용합니다.
+        final String? imageUrl = cleanImageUrl;
 
         if (isWriter) {
           // ⭕ 내가 작성자일 때: 홈 화면 로직 그대로 writerDetailPage로 이동
@@ -410,6 +429,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 nickname: nickname,
                 tags: tags,
                 imageUrl: imageUrl,
+                heroTag: 'chat_image_$postId', 
               ),
             ),
           );
@@ -429,6 +449,7 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
                 nickname: nickname,
                 tags: tags,
                 imageUrl: imageUrl,
+                heroTag: 'chat_image_$postId', 
               ),
             ),
           );
@@ -454,10 +475,10 @@ class _ChatRoomScreenState extends State<ChatRoomScreen> {
             ClipRRect(
               borderRadius: BorderRadius.circular(12),
               child:
-                  widget.room.postImage != null &&
-                      widget.room.postImage!.isNotEmpty
+                  // 🌟 이제 이 UI 구역에서도 함수 최상단에 있는 cleanImageUrl을 찾을 수 있습니다!
+                  cleanImageUrl != null && cleanImageUrl.isNotEmpty
                   ? Image.network(
-                      "$Config.baseUrl${widget.room.postImage}",
+                      cleanImageUrl.startsWith('http') ? cleanImageUrl : "${Config.baseUrl}$cleanImageUrl",
                       width: 64,
                       height: 64,
                       fit: BoxFit.cover,

@@ -388,7 +388,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 date: deadlineInfo,
                 nickname: nickname,
                 tags: tags,
-                imageUrl: imageUrl,
+                imageUrl: getRealImageUrl(imageUrl),
+                heroTag: 'home_image_$postId',
               ),
             ),
           );
@@ -406,7 +407,8 @@ class _HomeScreenState extends State<HomeScreen> {
                 date: deadlineInfo,
                 nickname: nickname,
                 tags: tags,
-                imageUrl: imageUrl,
+                imageUrl: getRealImageUrl(imageUrl),
+                heroTag: 'home_image_$postId',
               ),
             ),
           );

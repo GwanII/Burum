@@ -15,6 +15,7 @@ class writerDetailPage extends StatelessWidget {
   final String nickname;
   final List<String> tags;
   final String? imageUrl;
+  final String heroTag;
 
   // 2. 생성자
   const writerDetailPage({
@@ -27,6 +28,7 @@ class writerDetailPage extends StatelessWidget {
     required this.nickname,
     required this.tags,
     this.imageUrl,
+    required this.heroTag,
   });
 
   // 🌟 심폐소생술 1: 작성자 화면이라면 당연히 있어야 할 '삭제' 기능 추가!
@@ -107,7 +109,10 @@ class writerDetailPage extends StatelessWidget {
               width: double.infinity,
               color: Colors.grey.shade300,
               child: (imageUrl != null && imageUrl!.isNotEmpty)
-                  ? Image.network(imageUrl!, fit: BoxFit.cover)
+                  ? Hero(
+                    tag: heroTag,
+                    child: Image.network(imageUrl!, fit: BoxFit.cover),
+                  )
                   : const Icon(
                       Icons.image_not_supported,
                       size: 50,
