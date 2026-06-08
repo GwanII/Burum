@@ -80,6 +80,8 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   LatLng _selectedLatLng = const LatLng(35.154, 128.114);
   GoogleMapController? _mapController;
 
+  bool _isAiLoading = false; // 🤖 AI 로딩 상태 감지 스위치
+
   // 🌟 [방에 들어올 때 기존 짐이 있으면 풀어서 세팅하는 마법!]
   @override
   void initState() {
@@ -88,15 +90,90 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       _titleController.text = widget.initialTitle ?? '';
       _contentController.text = widget.initialContent ?? '';
       // 가격에서 '원'과 콤마를 떼고 숫자만 세팅
-      _costController.text = widget.initialCost?.replaceAll('원', '').replaceAll(',', '') ?? '';
-      
+      _costController.text =
+          widget.initialCost?.replaceAll('원', '').replaceAll(',', '') ?? '';
+
       if (widget.initialTags != null) {
         _tags = List.from(widget.initialTags!);
       }
       if (widget.initialDate != null && widget.initialDate != '마감일 없음') {
         _dateController.text = widget.initialDate!;
       }
-      // 위치나 이미지는 복잡해질 수 있으니 일단 기본값 세팅 (필요시 백엔드에서 위도/경도도 받아와야 완벽해짐!)
+    }
+  }
+
+  // 🔮 [AI 가격 예측 요청 마법 함수]
+  Future<void> _fetchAiPrice() async {
+    if (_isAiLoading) return;
+
+    // 🚨 [철벽 방어막] 제목, 내용, 장소 중 하나라도 텅 비어있으면 저지한다!
+    if (_titleController.text.trim().isEmpty ||
+        _contentController.text.trim().isEmpty ||
+        _locationController.text.trim().isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('⚠️ AI 요금 분석을 위해 [제목], [내용], [장소]를 모두 채워주시오!'),
+            backgroundColor: Colors.orangeAccent,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+      return; // 빈 칸이 하나라도 있다면 여기서 가차없이 차단!
+    }
+
+    setState(() {
+      _isAiLoading = true;
+    });
+
+    try {
+      // 리스트 형태의 태그들을 하나의 공백 구분 문자열로 통합 (예: "#급구 #무거움")
+      String tagsString = _tags.join(' ');
+
+      // 백엔드 Express 서버의 AI 연동 주소로 라우팅!
+      final response = await DioClient.instance.post(
+        '${Config.baseUrl}/api/createErrand/predict-price',
+        data: {
+          "title": _titleController.text,
+          "content": _contentController.text,
+          "hashtags": tagsString,
+          "location": _locationController.text,
+        },
+      );
+
+      if (response.statusCode == 200 && response.data != null) {
+        final data = response.data;
+        if (data['success'] == true) {
+          int recommendedPrice = data['recommended_price'];
+
+          // 숫자를 천 단위로 콤마 포맷팅 해주는 정규식 변환 마법
+          String formattedPrice = recommendedPrice.toString().replaceAllMapped(
+            RegExp(r'(\d{1,3})(?=(\d{3})+(?!\d))'),
+            (Match m) => '${m[1]},',
+          );
+
+          setState(() {
+            _costController.text = formattedPrice; // 가격 칸에 강제 주입!
+          });
+
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('🤖 AI가 내용을 분석해 적정 요금을 주입했소!')),
+            );
+          }
+        }
+      }
+    } catch (e) {
+      print("🚨 AI 가격 추천 실패: $e");
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('🔥 AI 연동 실패! 서버가 켜져 있는지 확인하시오.')),
+        );
+      }
+    } finally {
+      setState(() {
+        _isAiLoading = false;
+      });
     }
   }
 
@@ -163,12 +240,24 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       context: context,
       builder: (context) => AlertDialog(
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: const Text('실패', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
+        title: const Text(
+          '실패',
+          style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.redAccent,
+          ),
+        ),
         content: Text(message, style: const TextStyle(fontSize: 16)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('확인', style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold)),
+            child: const Text(
+              '확인',
+              style: TextStyle(
+                color: Colors.black,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ],
       ),
@@ -178,17 +267,20 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
   // 🌟 [대망의 전송 마법! 생성(POST)과 수정(PUT)을 지능적으로 구별하오!]
   Future<void> _submitErrand() async {
     if (_titleController.text.length > 40) {
-      _showErrorPopup('제목은 40자를 초과할 수 없습니다.\n(현재: ${_titleController.text.length}자)');
+      _showErrorPopup(
+        '제목은 40자를 초과할 수 없습니다.\n(현재: ${_titleController.text.length}자)',
+      );
       return;
     }
     if (_contentController.text.length > 500) {
-      _showErrorPopup('내용은 500자를 초과할 수 없습니다.\n(현재: ${_contentController.text.length}자)');
+      _showErrorPopup(
+        '내용은 500자를 초과할 수 없습니다.\n(현재: ${_contentController.text.length}자)',
+      );
       return;
     }
 
     const storage = FlutterSecureStorage();
     String? myAccessToken = await storage.read(key: 'accessToken');
-    String? myUserId = await storage.read(key: 'userId');
 
     if (myAccessToken == null) {
       if (mounted) {
@@ -219,10 +311,9 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       List<MultipartFile> multipartImages = [];
       for (var file in _selectedImages) {
         multipartImages.add(
-          await MultipartFile.fromFile(file.path, filename: file.name)
+          await MultipartFile.fromFile(file.path, filename: file.name),
         );
       }
-      // 백엔드 라우터(upload.array('images'))가 기다리는 정확한 이름표 'images'를 붙여주오!
       formDataMap['images'] = multipartImages;
     }
 
@@ -233,13 +324,11 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       bool isEditMode = widget.postId != null; // 수정 모드인지 판별!
 
       if (isEditMode) {
-        // 🛠️ 수정 모드일 때: PUT /api/posts/:id 로 쏜다!
         response = await DioClient.instance.put(
           '${Config.baseUrl}/api/posts/${widget.postId}',
           data: formData,
         );
       } else {
-        // ✨ 생성 모드일 때: POST /api/createErrand 로 쏜다!
         response = await DioClient.instance.post(
           '${Config.baseUrl}/api/createErrand',
           data: formData,
@@ -249,10 +338,13 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       if (response.statusCode == 201 || response.statusCode == 200) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(isEditMode ? '심부름이 성공적으로 수정되었습니다.' : '심부름이 성공적으로 등록되었습니다.')),
+            SnackBar(
+              content: Text(
+                isEditMode ? '심부름이 성공적으로 수정되었습니다.' : '심부름이 성공적으로 등록되었습니다.',
+              ),
+            ),
           );
 
-          // 홈 화면으로 완전히 돌아가서 새로고침 되도록 유도!
           Navigator.pushAndRemoveUntil(
             context,
             MaterialPageRoute(builder: (context) => const MainScreen()),
@@ -285,24 +377,49 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     bool isEditMode = widget.postId != null; // 🌟 현재 모드가 무엇인지 파악!
 
     return PopScope(
-      canPop: false, 
+      canPop: false,
       onPopInvoked: (didPop) async {
         if (didPop) return;
 
         bool? shouldLeave = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-            title: const Text('취소 확인', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.redAccent)),
-            content: Text(isEditMode ? '수정을 취소하시겠습니까?\n변경 사항은 저장되지 않습니다.' : '게시물 작성을 취소하시겠습니까?\n작성 중인 내용은 저장되지 않습니다.', style: const TextStyle(fontSize: 16)),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              '취소 확인',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.redAccent,
+              ),
+            ),
+            content: Text(
+              isEditMode
+                  ? '수정을 취소하시겠습니까?\n변경 사항은 저장되지 않습니다.'
+                  : '게시물 작성을 취소하시겠습니까?\n작성 중인 내용은 저장되지 않습니다.',
+              style: const TextStyle(fontSize: 16),
+            ),
             actions: [
               TextButton(
                 onPressed: () => Navigator.pop(context, false),
-                child: const Text('아니오', style: TextStyle(color: Colors.grey, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  '아니오',
+                  style: TextStyle(
+                    color: Colors.grey,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
               TextButton(
                 onPressed: () => Navigator.pop(context, true),
-                child: const Text('예(나가기)', style: TextStyle(color: Colors.redAccent, fontWeight: FontWeight.bold)),
+                child: const Text(
+                  '예(나가기)',
+                  style: TextStyle(
+                    color: Colors.redAccent,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ],
           ),
@@ -321,8 +438,14 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
             icon: const Icon(Icons.arrow_back, color: Colors.black),
             onPressed: () => Navigator.maybePop(context),
           ),
-          // 🌟 타이틀도 똑똑하게 바뀜!
-          title: Text(isEditMode ? '게시물 수정' : '게시물 생성', style: const TextStyle(color: Colors.black, fontWeight: FontWeight.bold, fontSize: 18)),
+          title: Text(
+            isEditMode ? '게시물 수정' : '게시물 생성',
+            style: const TextStyle(
+              color: Colors.black,
+              fontWeight: FontWeight.bold,
+              fontSize: 18,
+            ),
+          ),
           centerTitle: true,
         ),
         body: SingleChildScrollView(
@@ -337,15 +460,25 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                     GestureDetector(
                       onTap: _pickImages,
                       child: Container(
-                        width: 100, height: 100,
+                        width: 100,
+                        height: 100,
                         margin: const EdgeInsets.only(right: 12),
-                        decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+                        decoration: BoxDecoration(
+                          color: inputGrey,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.center,
                           children: [
                             const Icon(Icons.camera_alt, color: Colors.black54),
                             const SizedBox(height: 4),
-                            Text('${_selectedImages.length}/10', style: const TextStyle(color: Colors.black54, fontSize: 12)),
+                            Text(
+                              '${_selectedImages.length}/10',
+                              style: const TextStyle(
+                                color: Colors.black54,
+                                fontSize: 12,
+                              ),
+                            ),
                           ],
                         ),
                       ),
@@ -357,22 +490,37 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
                       return Stack(
                         children: [
                           Container(
-                            width: 100, height: 100,
+                            width: 100,
+                            height: 100,
                             margin: const EdgeInsets.only(right: 12),
                             clipBehavior: Clip.hardEdge,
-                            decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), color: inputGrey),
+                            decoration: BoxDecoration(
+                              borderRadius: BorderRadius.circular(12),
+                              color: inputGrey,
+                            ),
                             child: kIsWeb
-                                ? Image.network(file.path, fit: BoxFit.cover) 
-                                : Image.file(File(file.path), fit: BoxFit.cover), 
+                                ? Image.network(file.path, fit: BoxFit.cover)
+                                : Image.file(
+                                    File(file.path),
+                                    fit: BoxFit.cover,
+                                  ),
                           ),
                           Positioned(
-                            right: 12, top: 0,
+                            right: 12,
+                            top: 0,
                             child: GestureDetector(
                               onTap: () => _removeImage(index),
                               child: Container(
-                                decoration: const BoxDecoration(color: Colors.black54, shape: BoxShape.circle),
+                                decoration: const BoxDecoration(
+                                  color: Colors.black54,
+                                  shape: BoxShape.circle,
+                                ),
                                 padding: const EdgeInsets.all(4),
-                                child: const Icon(Icons.close, color: Colors.white, size: 16),
+                                child: const Icon(
+                                  Icons.close,
+                                  color: Colors.white,
+                                  size: 16,
+                                ),
                               ),
                             ),
                           ),
@@ -384,41 +532,89 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
               ),
 
               const SizedBox(height: 20),
-              _buildCustomTextField('제목을 입력해주세요', _titleController, maxLength: 40),
-              const SizedBox(height: 12),
-              const Row(
-                children: [
-                  Text('AI ', style: TextStyle(color: Colors.orange, fontWeight: FontWeight.bold, fontSize: 13)),
-                  Text('가격 추천', style: TextStyle(color: Colors.grey, fontSize: 13)),
-                ],
+              _buildCustomTextField(
+                '제목을 입력해주세요',
+                _titleController,
+                maxLength: 40,
               ),
+              const SizedBox(height: 12),
+
+              // 🧙‍♂️ [클릭 가능한 AI 가격 추천 마법 텍스트 배치]
+              GestureDetector(
+                onTap: _fetchAiPrice,
+                child: Row(
+                  children: [
+                    const Text(
+                      'AI ',
+                      style: TextStyle(
+                        color: Colors.orange,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                    Text(
+                      _isAiLoading
+                          ? '요금 분석 주술 시전 중...'
+                          : '가격 추천 (여기 글자를 클릭하시오! 🪄)',
+                      style: const TextStyle(
+                        color: Colors.grey,
+                        fontSize: 13,
+                        decoration: TextDecoration.underline,
+                      ),
+                    ),
+                    if (_isAiLoading) ...[
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 12,
+                        height: 12,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          color: Colors.orange,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+
               const SizedBox(height: 6),
               Row(
                 children: [
                   Expanded(
                     child: _buildCustomTextField(
-                      '가격을 입력해주세요', _costController, isNumber: true, formatters: [ThousandsSeparatorInputFormatter()],
+                      '가격을 입력해주세요',
+                      _costController,
+                      isNumber: true,
+                      formatters: [ThousandsSeparatorInputFormatter()],
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
                     child: GestureDetector(
                       onTap: () => _selectDate(context),
-                      child: AbsorbPointer(child: _buildCustomTextField('날짜 선택', _dateController)),
+                      child: AbsorbPointer(
+                        child: _buildCustomTextField('날짜 선택', _dateController),
+                      ),
                     ),
                   ),
                 ],
               ),
               const SizedBox(height: 12),
               Container(
-                decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+                decoration: BoxDecoration(
+                  color: inputGrey,
+                  borderRadius: BorderRadius.circular(12),
+                ),
                 padding: const EdgeInsets.only(bottom: 8),
                 child: TextField(
                   controller: _contentController,
-                  maxLines: 5, maxLength: 500,
+                  maxLines: 5,
+                  maxLength: 500,
                   decoration: const InputDecoration(
-                    hintText: '내용을 입력해주세요', hintStyle: TextStyle(color: Colors.black54),
-                    border: InputBorder.none, contentPadding: EdgeInsets.all(16),
+                    hintText: '내용을 입력해주세요',
+                    hintStyle: TextStyle(color: Colors.black54),
+                    border: InputBorder.none,
+                    contentPadding: EdgeInsets.all(16),
                   ),
                 ),
               ),
@@ -426,86 +622,161 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
               TextField(
                 controller: _tagController,
                 decoration: InputDecoration(
-                  hintText: '해시태그 입력 후 엔터', filled: true, fillColor: inputGrey,
-                  border: OutlineInputBorder(borderRadius: BorderRadius.circular(12), borderSide: BorderSide.none),
+                  hintText: '해시태그 입력 후 엔터',
+                  filled: true,
+                  fillColor: inputGrey,
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(12),
+                    borderSide: BorderSide.none,
+                  ),
                   contentPadding: const EdgeInsets.symmetric(horizontal: 16),
                 ),
                 onSubmitted: _addTag,
               ),
               const SizedBox(height: 8),
               Wrap(
-                spacing: 8.0, runSpacing: 4.0,
-                children: _tags.map((tag) => InputChip(label: Text(tag), backgroundColor: mainYellow, onDeleted: () => _removeTag(tag))).toList(),
+                spacing: 8.0,
+                runSpacing: 4.0,
+                children: _tags
+                    .map(
+                      (tag) => InputChip(
+                        label: Text(tag),
+                        backgroundColor: mainYellow,
+                        onDeleted: () => _removeTag(tag),
+                      ),
+                    )
+                    .toList(),
               ),
 
               const SizedBox(height: 24),
               Row(
                 children: [
-                  Expanded(child: _buildCustomTextField('장소를 입력 해주세요', _locationController)),
+                  Expanded(
+                    child: _buildCustomTextField(
+                      '장소를 입력 해주세요',
+                      _locationController,
+                    ),
+                  ),
                   const SizedBox(width: 12),
-                  const Icon(Icons.location_on_outlined, size: 40, color: Colors.black),
+                  const Icon(
+                    Icons.location_on_outlined,
+                    size: 40,
+                    color: Colors.black,
+                  ),
                 ],
               ),
               const SizedBox(height: 20),
 
               const Text(
                 '📍 상세 위치 픽 (지도를 터치하여 정확한 마커를 꽂으시오!)',
-                style: TextStyle(fontSize: 14, fontWeight: FontWeight.bold, color: Colors.black87),
+                style: TextStyle(
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black87,
+                ),
               ),
               const SizedBox(height: 8),
               Container(
-                height: 220, width: double.infinity,
+                height: 220,
+                width: double.infinity,
                 clipBehavior: Clip.hardEdge,
-                decoration: BoxDecoration(borderRadius: BorderRadius.circular(12), border: Border.all(color: Colors.black26, width: 1)),
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.black26, width: 1),
+                ),
                 child: GoogleMap(
-                  initialCameraPosition: CameraPosition(target: _selectedLatLng, zoom: 16.0),
+                  initialCameraPosition: CameraPosition(
+                    target: _selectedLatLng,
+                    zoom: 16.0,
+                  ),
                   onTap: (LatLng newLatLng) async {
-                    setState(() { _selectedLatLng = newLatLng; });
-                    print('🎯 픽한 위치 좌표: ${newLatLng.latitude}, ${newLatLng.longitude}');
+                    setState(() {
+                      _selectedLatLng = newLatLng;
+                    });
+                    print(
+                      '🎯 픽한 위치 좌표: ${newLatLng.latitude}, ${newLatLng.longitude}',
+                    );
 
                     if (kIsWeb) {
-                      setState(() { _locationController.text = "웹 테스트 중 (실제 주소를 직접 입력하시오!)"; });
+                      setState(() {
+                        _locationController.text = "웹 테스트 중 (실제 주소를 직접 입력하시오!)";
+                      });
                     } else {
                       try {
-                        List<Placemark> placemarks = await placemarkFromCoordinates(newLatLng.latitude, newLatLng.longitude);
+                        List<Placemark> placemarks =
+                            await placemarkFromCoordinates(
+                              newLatLng.latitude,
+                              newLatLng.longitude,
+                            );
                         if (placemarks.isNotEmpty) {
-                          Placemark place = placemarks[0]; 
-                          String fullAddress = '${place.administrativeArea} ${place.locality} ${place.subLocality} ${place.thoroughfare} ${place.subThoroughfare}';
-                          fullAddress = fullAddress.replaceAll('null', '').replaceAll(RegExp(r'\s+'), ' ').trim();
-                          setState(() { _locationController.text = fullAddress; });
+                          Placemark place = placemarks[0];
+                          String fullAddress =
+                              '${place.administrativeArea} ${place.locality} ${place.subLocality} ${place.thoroughfare} ${place.subThoroughfare}';
+                          fullAddress = fullAddress
+                              .replaceAll('null', '')
+                              .replaceAll(RegExp(r'\s+'), ' ')
+                              .trim();
+                          setState(() {
+                            _locationController.text = fullAddress;
+                          });
                         }
                       } catch (e) {
                         print("🚨 주소 번역 마법 실패: $e");
-                        setState(() { _locationController.text = "주소를 불러오지 못했소!"; });
+                        setState(() {
+                          _locationController.text = "주소를 불러오지 못했소!";
+                        });
                       }
                     }
                   },
-                  onMapCreated: (GoogleMapController controller) { _mapController = controller; },
+                  onMapCreated: (GoogleMapController controller) {
+                    _mapController = controller;
+                  },
                   markers: {
                     Marker(
                       markerId: const MarkerId('picked_errand_location'),
                       position: _selectedLatLng,
-                      icon: BitmapDescriptor.defaultMarkerWithHue(BitmapDescriptor.hueRed),
+                      icon: BitmapDescriptor.defaultMarkerWithHue(
+                        BitmapDescriptor.hueRed,
+                      ),
                     ),
                   },
-                  mapToolbarEnabled: false, zoomControlsEnabled: true, myLocationButtonEnabled: false,
+                  mapToolbarEnabled: false,
+                  zoomControlsEnabled: true,
+                  myLocationButtonEnabled: false,
                 ),
               ),
               const SizedBox(height: 8),
               Text(
                 '현재 픽한 위도: ${_selectedLatLng.latitude.toStringAsFixed(8)} / 경도: ${_selectedLatLng.longitude.toStringAsFixed(8)}',
-                style: const TextStyle(color: Colors.black54, fontSize: 12, fontWeight: FontWeight.bold),
+                style: const TextStyle(
+                  color: Colors.black54,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
 
               const SizedBox(height: 40),
 
               SizedBox(
-                width: double.infinity, height: 56,
+                width: double.infinity,
+                height: 56,
                 child: ElevatedButton(
                   onPressed: _submitErrand,
-                  style: ElevatedButton.styleFrom(backgroundColor: mainYellow, elevation: 0, shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
-                  // 🌟 버튼 텍스트도 똑똑하게 바뀜!
-                  child: Text(isEditMode ? '수정 완료' : '작성 완료', style: const TextStyle(color: Colors.black, fontSize: 18, fontWeight: FontWeight.bold)),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: mainYellow,
+                    elevation: 0,
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: Text(
+                    isEditMode ? '수정 완료' : '작성 완료',
+                    style: const TextStyle(
+                      color: Colors.black,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -516,17 +787,32 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
     );
   }
 
-  Widget _buildCustomTextField(String hint, TextEditingController controller, {bool isNumber = false, int? maxLength, List<TextInputFormatter>? formatters}) {
+  Widget _buildCustomTextField(
+    String hint,
+    TextEditingController controller, {
+    bool isNumber = false,
+    int? maxLength,
+    List<TextInputFormatter>? formatters,
+  }) {
     return Container(
-      decoration: BoxDecoration(color: inputGrey, borderRadius: BorderRadius.circular(12)),
+      decoration: BoxDecoration(
+        color: inputGrey,
+        borderRadius: BorderRadius.circular(12),
+      ),
       padding: EdgeInsets.only(bottom: maxLength != null ? 8 : 0),
       child: TextField(
         controller: controller,
         keyboardType: isNumber ? TextInputType.number : TextInputType.text,
-        maxLength: maxLength, inputFormatters: formatters,
+        maxLength: maxLength,
+        inputFormatters: formatters,
         decoration: InputDecoration(
-          hintText: hint, hintStyle: const TextStyle(color: Colors.black54),
-          border: InputBorder.none, contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          hintText: hint,
+          hintStyle: const TextStyle(color: Colors.black54),
+          border: InputBorder.none,
+          contentPadding: const EdgeInsets.symmetric(
+            horizontal: 16,
+            vertical: 14,
+          ),
         ),
       ),
     );
