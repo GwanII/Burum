@@ -7,7 +7,7 @@ import '../config.dart';
 import '../dio_client.dart';
 import '../models/chat_room.dart';
 import '../screens/chat_room_screen.dart';
-import '../screens/profile_detail_screen.dart'; 
+import '../screens/profile_detail_screen.dart';
 
 // 🌟 상태가 변해야 하므로 StatefulWidget으로 변경!
 class PostDetailScreen extends StatefulWidget {
@@ -56,6 +56,20 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
     super.initState();
     // 화면이 켜질 때 초기 지원 상태를 가져옵니다.
     _isApplied = widget.initialIsApplied;
+
+    // 화면에 진입할 때 조회수 증가 API 호출
+    _increaseViewCount();
+  }
+
+  // 🌟 조회수 증가 통신 함수
+  Future<void> _increaseViewCount() async {
+    try {
+      // 백엔드 API 주소에 맞게 수정해주세요. (예: /api/posts/123/view)
+      await DioClient.instance.post('/api/posts/${widget.postId}/view');
+    } catch (e) {
+      // 조회수 증가 실패는 사용자에게 알릴 필요 없이 로그만 남깁니다.
+      print('조회수 증가 에러: $e');
+    }
   }
 
   // 🌟 지원하기 통신 함수
@@ -315,9 +329,9 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               color: Colors.grey.shade300,
               child: (widget.imageUrl != null && widget.imageUrl!.isNotEmpty)
                   ? Hero(
-                    tag: widget.heroTag,
-                    child: Image.network(widget.imageUrl!, fit: BoxFit.cover),
-                  )
+                      tag: widget.heroTag,
+                      child: Image.network(widget.imageUrl!, fit: BoxFit.cover),
+                    )
                   : const Icon(
                       Icons.image_not_supported,
                       size: 50,
@@ -327,67 +341,69 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
             const SizedBox(height: 15),
 
             // 프로필 영역
-Padding(
-  padding: const EdgeInsets.symmetric(horizontal: 20),
-  child: InkWell(
-    borderRadius: BorderRadius.circular(12),
-    onTap: () {
-      final writerUserId = int.tryParse(widget.writerId);
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20),
+              child: InkWell(
+                borderRadius: BorderRadius.circular(12),
+                onTap: () {
+                  final writerUserId = int.tryParse(widget.writerId);
 
-      if (writerUserId == null) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('프로필 정보를 열 수 없습니다.')),
-        );
-        return;
-      }
+                  if (writerUserId == null) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('프로필 정보를 열 수 없습니다.')),
+                    );
+                    return;
+                  }
 
-      Navigator.push(
-        context,
-        MaterialPageRoute(
-          builder: (_) => ProfileDetailScreen(userId: writerUserId),
-        ),
-      );
-    },
-    child: Padding(
-      padding: const EdgeInsets.symmetric(vertical: 6),
-      child: Row(
-        children: [
-          const CircleAvatar(
-            radius: 25,
-            backgroundImage: NetworkImage('https://picsum.photos/200'),
-          ),
-          const SizedBox(width: 15),
-          Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.nickname,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => ProfileDetailScreen(userId: writerUserId),
+                    ),
+                  );
+                },
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(vertical: 6),
+                  child: Row(
+                    children: [
+                      const CircleAvatar(
+                        radius: 25,
+                        backgroundImage: NetworkImage(
+                          'https://picsum.photos/200',
+                        ),
+                      ),
+                      const SizedBox(width: 15),
+                      Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            widget.nickname,
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          const SizedBox(height: 4),
+                          const Text(
+                            '심부름 마스터',
+                            style: TextStyle(fontSize: 12, color: Colors.grey),
+                          ),
+                        ],
+                      ),
+                      const Spacer(),
+                      const Text(
+                        'B급',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF5C6BC0),
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
-              const SizedBox(height: 4),
-              const Text(
-                '심부름 마스터',
-                style: TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-            ],
-          ),
-          const Spacer(),
-          const Text(
-            'B급',
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Color(0xFF5C6BC0),
             ),
-          ),
-        ],
-      ),
-    ),
-  ),
-),
 
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 15),

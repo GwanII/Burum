@@ -68,8 +68,6 @@ class _HomeScreenState extends State<HomeScreen> {
   }
   // =========================================================================
 
-
-  
   // 🌟 변경 포인트 1: 닉네임 로드
   Future<void> _loadUserNickname() async {
     try {
@@ -99,7 +97,7 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final response = await DioClient.instance.get('/api/posts');
       setState(() {
-        _posts = response.data;
+        _posts = response.data['recommendedPosts']; // 추천 목록 가져오기!!
         _filteredPosts = _posts; // 🌟 처음엔 전체 리스트를 보여주기 위해 그대로 복사!
       });
     } catch (e) {
@@ -298,8 +296,16 @@ class _HomeScreenState extends State<HomeScreen> {
                                 _buildErrandItem(
                                   // 🌟 핵심 추가 포인트 1: 백엔드 데이터에서 ID 뽑아내기
                                   // 서버가 id, post_id, _id 중 무엇을 쓸지 몰라 방어적으로 작성했습니다.
-                                  postId: post['id']?.toString() ?? post['post_id']?.toString() ?? post['_id']?.toString() ?? '',
-                                  writerId: post['writer_id']?.toString() ?? post['user_id']?.toString() ?? post['writerId']?.toString() ?? '', // 다은 작성자 id 추가
+                                  postId:
+                                      post['id']?.toString() ??
+                                      post['post_id']?.toString() ??
+                                      post['_id']?.toString() ??
+                                      '',
+                                  writerId:
+                                      post['writer_id']?.toString() ??
+                                      post['user_id']?.toString() ??
+                                      post['writerId']?.toString() ??
+                                      '', // 다은 작성자 id 추가
                                   title: post['title'] ?? '',
                                   desc: post['content'] ?? '',
                                   price: '${post['cost']}원',
@@ -431,9 +437,10 @@ class _HomeScreenState extends State<HomeScreen> {
               clipBehavior: Clip.hardEdge,
               // --성빈==========================================================
               child: Hero(
-                tag: 'post_image_$postId', // 🌟 post['id']가 아니라 함수 파라미터인 postId 사용!
+                tag:
+                    'post_image_$postId', // 🌟 post['id']가 아니라 함수 파라미터인 postId 사용!
                 child: getRealImageUrl(imageUrl).isEmpty
-                    ? Container(color: const Color(0xFFFFF176)) 
+                    ? Container(color: const Color(0xFFFFF176))
                     : Image.network(
                         getRealImageUrl(imageUrl),
                         fit: BoxFit.cover,
