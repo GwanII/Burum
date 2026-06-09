@@ -97,11 +97,22 @@ class _HomeScreenState extends State<HomeScreen> {
     try {
       final response = await DioClient.instance.get('/api/posts');
       setState(() {
-        _posts = response.data['recommendedPosts']; // 추천 목록 가져오기!!
-        _filteredPosts = _posts; // 🌟 처음엔 전체 리스트를 보여주기 위해 그대로 복사!
+        // --성빈 🌟 [요괴 퇴치 1] 서버 데이터가 없거나 형식이 달라도 앱이 터지지 않도록 절대 방어막 추가! -성빈-
+        var rawData = response.data['recommendedPosts'] ?? response.data['posts'] ?? response.data;
+        if (rawData is List) {
+          _posts = rawData;
+        } else {
+          _posts = []; // 리스트가 아니면 빈 바구니로 초기화!
+        }
+        _filteredPosts = _posts; 
       });
     } catch (e) {
       print('게시글 로드 실패: $e');
+      // --성빈 통신 실패 시에도 뻗지 않도록 빈 리스트 장착! -성빈-
+      setState(() {
+        _posts = [];
+        _filteredPosts = [];
+      });
     }
   }
 
@@ -291,16 +302,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       : Column(
                           // 🌟 이제 원본 _posts가 아니라 _filteredPosts를 그립니다!
                           children: _filteredPosts.map((post) {
+                            
+                            // --성빈 🌟 [요괴 퇴치 2] Hero 위젯 태그 중복으로 인한 터치 먹통(앱 멈춤) 방지! -성빈-
+                            String safePostId = post['id']?.toString() ??
+                                                post['post_id']?.toString() ??
+                                                post['_id']?.toString() ??
+                                                '';
+                            if (safePostId.isEmpty) {
+                              // 백엔드에서 id를 주지 않아 공백이 되면 강제로 고유 키를 부여하여 화면 충돌을 막소!
+                              safePostId = UniqueKey().toString();
+                            }
+
                             return Column(
                               children: [
                                 _buildErrandItem(
-                                  // 🌟 핵심 추가 포인트 1: 백엔드 데이터에서 ID 뽑아내기
-                                  // 서버가 id, post_id, _id 중 무엇을 쓸지 몰라 방어적으로 작성했습니다.
-                                  postId:
-                                      post['id']?.toString() ??
-                                      post['post_id']?.toString() ??
-                                      post['_id']?.toString() ??
-                                      '',
+                                  postId: safePostId, // 고유하게 보장된 안전한 ID 주입!
                                   writerId:
                                       post['writer_id']?.toString() ??
                                       post['user_id']?.toString() ??
@@ -438,7 +454,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // --성빈==========================================================
               child: Hero(
                 tag:
-                    'post_image_$postId', // 🌟 post['id']가 아니라 함수 파라미터인 postId 사용!
+                    'post_image_$postId', // 🌟 고유한 safePostId가 들어와 터치 먹통을 해결합니다!
                 child: getRealImageUrl(imageUrl).isEmpty
                     ? Container(color: const Color(0xFFFFF176))
                     : Image.network(
