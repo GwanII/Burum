@@ -342,16 +342,21 @@ class _HomeScreenState extends State<HomeScreen> {
                       : Column(
                           // 🌟 이제 원본 _posts가 아니라 _filteredPosts를 그립니다!
                           children: _filteredPosts.map((post) {
+                            
+                            // --성빈 🌟 [요괴 퇴치 2] Hero 위젯 태그 중복으로 인한 터치 먹통(앱 멈춤) 방지! -성빈-
+                            String safePostId = post['id']?.toString() ??
+                                                post['post_id']?.toString() ??
+                                                post['_id']?.toString() ??
+                                                '';
+                            if (safePostId.isEmpty) {
+                              // 백엔드에서 id를 주지 않아 공백이 되면 강제로 고유 키를 부여하여 화면 충돌을 막소!
+                              safePostId = UniqueKey().toString();
+                            }
+
                             return Column(
                               children: [
                                 _buildErrandItem(
-                                  // 🌟 핵심 추가 포인트 1: 백엔드 데이터에서 ID 뽑아내기
-                                  // 서버가 id, post_id, _id 중 무엇을 쓸지 몰라 방어적으로 작성했습니다.
-                                  postId:
-                                      post['id']?.toString() ??
-                                      post['post_id']?.toString() ??
-                                      post['_id']?.toString() ??
-                                      '',
+                                  postId: safePostId, // 고유하게 보장된 안전한 ID 주입!
                                   writerId:
                                       post['writer_id']?.toString() ??
                                       post['user_id']?.toString() ??
@@ -489,7 +494,7 @@ class _HomeScreenState extends State<HomeScreen> {
               // --성빈==========================================================
               child: Hero(
                 tag:
-                    'post_image_$postId', // 🌟 post['id']가 아니라 함수 파라미터인 postId 사용!
+                    'post_image_$postId', // 🌟 고유한 safePostId가 들어와 터치 먹통을 해결합니다!
                 child: getRealImageUrl(imageUrl).isEmpty
                     ? Container(color: const Color(0xFFFFF176))
                     : Image.network(
