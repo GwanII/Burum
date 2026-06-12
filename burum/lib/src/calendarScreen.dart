@@ -575,7 +575,7 @@ class _AddEventDialogState extends State<AddEventDialog> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            const Text('위대한 일정 추가!!!!!', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
+            const Text('일정 추가', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 22)),
             const SizedBox(height: 16),
             
             TextField(
