@@ -65,7 +65,13 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
   Future<void> _increaseViewCount() async {
     try {
       // 백엔드 API 주소에 맞게 수정해주세요. (예: /api/posts/123/view)
-      await DioClient.instance.post('/api/posts/${widget.postId}/view');
+      await DioClient.instance.post(
+        '/api/posts/${widget.postId}/view',
+        data: {'userId': widget.currentUserId},
+      );
+    } on DioException catch (e) {
+      // 조회수 증가 실패는 사용자에게 알릴 필요 없이 로그만 남깁니다.
+      print('조회수 증가 에러: $e');
     } catch (e) {
       // 조회수 증가 실패는 사용자에게 알릴 필요 없이 로그만 남깁니다.
       print('조회수 증가 에러: $e');
