@@ -138,6 +138,16 @@ class _LocationScreenState extends State<LocationScreen> {
       print(' 백엔드 응답 코드: ${response.statusCode}');
       print(' 백엔드 응답 내용: ${response.data}');
 
+      // 🌟 캐시에 위치 정보를 저장하여 다른 화면(HomeScreen 등)에서도 가져다 쓸 수 있도록 합니다.
+      await storage.write(
+        key: 'latitude',
+        value: _mapCenterPosition.latitude.toString(),
+      );
+      await storage.write(
+        key: 'longitude',
+        value: _mapCenterPosition.longitude.toString(),
+      );
+
       // 화면이 닫혔다면 UI 조작을 중단하여 에러 방지
       if (!mounted) return;
 

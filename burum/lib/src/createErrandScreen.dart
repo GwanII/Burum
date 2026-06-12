@@ -7,6 +7,7 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 import 'package:flutter/services.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geocoding/geocoding.dart'; // 주소 통역 마법서
+import 'package:geolocator/geolocator.dart'; // 🌟 현재 위치 스캐너 추가
 import 'package:image_picker/image_picker.dart'; // 갤러리 소환술사
 import 'main_Screen.dart';
 import 'postDetailScreen.dart';
@@ -99,6 +100,32 @@ class _CreateErrandsPageState extends State<CreateErrandsPage> {
       if (widget.initialDate != null && widget.initialDate != '마감일 없음') {
         _dateController.text = widget.initialDate!;
       }
+    }
+    // 🌟 화면을 열자마자 내 현재 GPS 위치를 가져오도록 호출!
+    _fetchCurrentLocation();
+  }
+
+  // 🌟 기기의 실제 GPS를 확인하여 지도의 중심을 내 위치로 이동시키는 함수
+  Future<void> _fetchCurrentLocation() async {
+    try {
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied) {
+        permission = await Geolocator.requestPermission();
+      }
+      if (permission == LocationPermission.whileInUse ||
+          permission == LocationPermission.always) {
+        Position position = await Geolocator.getCurrentPosition(
+          desiredAccuracy: LocationAccuracy.high,
+        );
+        setState(() {
+          _selectedLatLng = LatLng(position.latitude, position.longitude);
+        });
+        _mapController?.animateCamera(
+          CameraUpdate.newLatLngZoom(_selectedLatLng, 16.0),
+        );
+      }
+    } catch (e) {
+      print('실제 GPS를 찾을 수 없어 기본 위치(진주)로 유지합니다: $e');
     }
   }
 

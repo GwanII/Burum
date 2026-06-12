@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:dio/dio.dart'; // 💡 http 대신 Dio 추가!
 import 'dart:convert'; // _parseTags에서 혹시 모를 String 파싱을 위해 남겨둠
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
+import 'package:geolocator/geolocator.dart'; // 🌟 실제 위치 정보 로드용
 
 import 'mapScreen.dart';
 import 'myPageScreen.dart';
@@ -95,13 +96,63 @@ class _HomeScreenState extends State<HomeScreen> {
   // 🌟 변경 포인트 2: 게시글 목록 로드 및 초기 필터 설정
   Future<void> _fetchPosts() async {
     try {
-      final response = await DioClient.instance.get('/api/posts');
+      // 💡 캐시(Secure Storage)에서 유저 ID와 저장된 위치 정보를 가져옵니다.
+      String? cachedUserId = await storage.read(key: 'userId');
+      String? cachedLat = await storage.read(key: 'latitude');
+      String? cachedLng = await storage.read(key: 'longitude');
+
+      int userId = int.tryParse(cachedUserId ?? '') ?? 0;
+      double myLat = 37.5665; // 기본값
+      double myLng = 126.9780;
+
+      // 🌟 캐시에 위치 정보가 있으면 그걸 쓰고, 없다면 스마트폰 GPS를 직접 켭니다.
+      if (cachedLat != null &&
+          cachedLng != null &&
+          cachedLat.isNotEmpty &&
+          cachedLng.isNotEmpty) {
+        myLat = double.tryParse(cachedLat) ?? 37.5665;
+        myLng = double.tryParse(cachedLng) ?? 126.9780;
+      } else {
+        try {
+          LocationPermission permission = await Geolocator.checkPermission();
+          if (permission == LocationPermission.denied) {
+            permission = await Geolocator.requestPermission();
+          }
+          if (permission == LocationPermission.whileInUse ||
+              permission == LocationPermission.always) {
+            Position position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+            );
+            myLat = position.latitude;
+            myLng = position.longitude;
+            // 다음 접속 시 빠르게 쓰기 위해 캐시에 저장해둡니다!
+            await storage.write(key: 'latitude', value: myLat.toString());
+            await storage.write(key: 'longitude', value: myLng.toString());
+          }
+        } catch (e) {
+          print('GPS를 가져올 수 없어 기본값(서울 시청)을 사용합니다: $e');
+        }
+      }
+
+      final response = await DioClient.instance.get(
+        '/api/posts/recommend',
+        queryParameters: {
+          'userId': userId,
+          'latitude': myLat,
+          'longitude': myLng,
+        },
+      );
+
       setState(() {
-        _posts = response.data['recommendedPosts']; // 추천 목록 가져오기!!
+        // 응답이 List 형태인지 Map 형태인지에 따라 유연하게 대응
+        _posts = response.data is List
+            ? response.data
+            : (response.data['recommendedPosts'] ?? []);
         _filteredPosts = _posts; // 🌟 처음엔 전체 리스트를 보여주기 위해 그대로 복사!
       });
+      print('✅ 추천 목록: ${response.data}');
     } catch (e) {
-      print('게시글 로드 실패: $e');
+      print('추천 게시물 조회 실패: $e');
     }
   }
 
