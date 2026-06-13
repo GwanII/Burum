@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:dio/dio.dart';
 import '../config.dart';
+import '../dio_client.dart';
 import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 // DB 구조에 맞게 Applicant 모델
@@ -13,6 +14,7 @@ class Applicant {
   final String specialty;
   final String introduction;
   final String status;
+  final int completedErrandCount; // 🌟 추가: 완료 횟수
 
   Applicant({
     required this.userId,
@@ -23,6 +25,7 @@ class Applicant {
     required this.specialty,
     required this.introduction,
     required this.status,
+    required this.completedErrandCount,
   });
 
   factory Applicant.fromJson(Map<String, dynamic> json) {
@@ -35,6 +38,7 @@ class Applicant {
       specialty: json['user_title'] ?? '타이틀 없음',
       introduction: json['apply_message'] ?? '지원 메시지가 없습니다.',
       status: json['status'] ?? 'PENDING',
+      completedErrandCount: json['completed_errand_count'] ?? 0, // 🌟 추가
     );
   }
 }
@@ -45,10 +49,10 @@ class ApplicantListPage extends StatefulWidget {
   final String postDeadline;
 
   const ApplicantListPage({
-    super.key, 
+    super.key,
     required this.postId,
-    required this.postTitle,    // 🌟 성빈이가 추가 
-    required this.postDeadline  // 🌟 성빈이가 추가
+    required this.postTitle, // 🌟 성빈이가 추가
+    required this.postDeadline, // 🌟 성빈이가 추가
   });
 
   @override
@@ -65,7 +69,6 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
   bool isShowingHiddenOnly = false; // 🌟 현재 가린 사람만 보고 있는지 여부
 
   List<int> selectedApplicantIds = [];
-  final Dio dio = Dio();
 
   @override
   void initState() {
@@ -75,31 +78,26 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
 
   Future<void> _fetchApplicants() async {
     try {
-      final url = '${Config.baseUrl}/api/posts/${widget.postId}/applicants';
-      final response = await dio.get(url);
+      final url = '/api/posts/${widget.postId}/applicants';
+      final response = await DioClient.instance.get(url);
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = response.data;
+      final List<dynamic> data = response.data;
 
-        setState(() {
-          applicants = data.map((json) => Applicant.fromJson(json)).toList();
-          _isExpandedList = List.generate(applicants.length, (index) => true);
-          hiddenApplicants = [];
-          _isHiddenExpandedList = [];
+      setState(() {
+        applicants = data.map((json) => Applicant.fromJson(json)).toList();
+        _isExpandedList = List.generate(applicants.length, (index) => true);
+        hiddenApplicants = [];
+        _isHiddenExpandedList = [];
 
-          selectedApplicantIds.clear();
-          for (var applicant in applicants) {
-            if (applicant.status == 'ACCEPTED') {
-              selectedApplicantIds.add(applicant.userId);
-            }
+        selectedApplicantIds.clear();
+        for (var applicant in applicants) {
+          if (applicant.status == 'ACCEPTED') {
+            selectedApplicantIds.add(applicant.userId);
           }
+        }
 
-          isLoading = false;
-        });
-      } else {
-        print("서버 에러: 상태 코드 ${response.statusCode}");
-        setState(() => isLoading = false);
-      }
+        isLoading = false;
+      });
     } catch (e) {
       print("통신 에러: $e");
       setState(() => isLoading = false);
@@ -138,7 +136,7 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
     );
   }
 
-// 🌟 선택하기 (수락) 로직
+  // 🌟 선택하기 (수락) 로직
   Future<void> _assignApplicant(int applicantId, String applicantName) async {
     bool confirm =
         await showDialog(
@@ -165,31 +163,24 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
 
     if (!confirm) return;
 
-    const storage = FlutterSecureStorage();
-    final token =
-        await storage.read(key: 'accessToken') ??
-        await storage.read(key: 'FlutterSecureStorage.accessToken');
-
     try {
-      final response = await dio.put(
-        '${Config.baseUrl}/api/createErrand/${widget.postId}/assign',
-        options: Options(headers: {'Authorization': 'Bearer $token'}),
+      // 🌟 [수정] 백엔드 라우터가 .post로 되어있으므로 put -> post로 변경합니다.
+      final response = await DioClient.instance.post(
+        '/api/createErrand/${widget.postId}/assign',
         data: {'userId': applicantId},
       );
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        
         // 🌟 성빈이가 추가한 부분: 심부름 확정 성공 시 캘린더 자동 등록 API 호출!
         try {
-          await dio.post(
-            '${Config.baseUrl}/api/calendar/errand/dual', // 👈 주소 확인!
-            options: Options(headers: {'Authorization': 'Bearer $token'}),
+          await DioClient.instance.post(
+            '/api/calendar/errand/dual',
             data: {
-              'applicantId': applicantId, 
-              'title': widget.postTitle, 
+              'applicantId': applicantId,
+              'title': widget.postTitle,
               'deadline': widget.postDeadline,
             },
           );
-
         } catch (calendarError) {
           print('🚨 캘린더 등록 실패: $calendarError');
         }
@@ -203,6 +194,11 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
       }
     } catch (e) {
       print(e);
+      if (mounted) {
+        ScaffoldMessenger.of(
+          context,
+        ).showSnackBar(SnackBar(content: Text('지원자 선택 중 오류가 발생했습니다: $e')));
+      }
     }
   }
 
@@ -328,36 +324,19 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
 
       // 3단계: 확인 시 Dio 통신 진행
       if (finalConfirm == true) {
-        const storage = FlutterSecureStorage();
-        final token =
-            await storage.read(key: 'accessToken') ??
-            await storage.read(key: 'FlutterSecureStorage.accessToken');
-
         try {
-          final url =
-              '${Config.baseUrl}/api/createErrand/${widget.postId}/cancelAssign';
-          final response = await dio.put(
+          final url = '/api/createErrand/${widget.postId}/cancelAssign';
+          final response = await DioClient.instance.put(
             url,
-            options: Options(
-              headers: {
-                'Content-Type': 'application/json',
-                'Authorization': 'Bearer $token',
-              },
-            ),
             data: {'userId': applicantId, 'reason': selectedReason},
           );
 
           if (response.statusCode == 200) {
-            
             // 🌟 성빈이가 추가한 부분: 심부름 취소 성공 시 캘린더 일정 자동 삭제 API 호출!
             try {
-              await dio.delete(
-                '${Config.baseUrl}/api/calendar/errand/dual',
-                options: Options(headers: {'Authorization': 'Bearer $token'}),
-                data: {
-                  'applicantId': applicantId,
-                  'title': widget.postTitle, 
-                },
+              await DioClient.instance.delete(
+                '/api/calendar/errand/dual',
+                data: {'applicantId': applicantId, 'title': widget.postTitle},
               );
             } catch (calendarError) {
               print('🚨 캘린더 삭제 실패: $calendarError');
@@ -365,7 +344,9 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
 
             if (mounted) {
               ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('❌ $applicantName님 선택이 취소되고 캘린더에서 삭제되었습니다.')),
+                SnackBar(
+                  content: Text('❌ $applicantName님 선택이 취소되고 캘린더에서 삭제되었습니다.'),
+                ),
               );
               setState(() => selectedApplicantIds.remove(applicantId));
             }
@@ -504,7 +485,7 @@ class _ApplicantListPageState extends State<ApplicantListPage> {
                                               CrossAxisAlignment.start,
                                           children: [
                                             Text(
-                                              applicant.name,
+                                              '${applicant.name} (${applicant.completedErrandCount}회)', // 🌟 완료 횟수 표시
                                               style: const TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
