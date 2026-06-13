@@ -26,7 +26,6 @@ class _LoginScreenState extends State<LoginScreen> {
 
   String _loadingType = '';
 
-
   Future<void> _login() async {
     final String email = _emailController.text.trim();
     final String password = _passwordController.text.trim();
@@ -45,11 +44,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
       final response = await DioClient.instance.post(
         '/api/users/login',
-        data: {
-          'email': email,
-          'password': password,
-          'autoLogin': _isAutoLogin,
-        },
+        data: {'email': email, 'password': password, 'autoLogin': _isAutoLogin},
       );
 
       print("==== 서버 응답 성공 ====");
@@ -70,7 +65,6 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     }
   }
-
 
   /*
   // 백엔드 API 호출 로직
@@ -111,8 +105,6 @@ class _LoginScreenState extends State<LoginScreen> {
     }
   }
   */
-
-
 
   // 구글 로그인 객체 생성
   final GoogleSignIn _googleSignIn = GoogleSignIn.instance;
@@ -272,7 +264,7 @@ class _LoginScreenState extends State<LoginScreen> {
     print(responseData['refreshToken']);
 
     print("nickname:");
-    print(responseData['nickname']);  
+    print(responseData['nickname']);
     final accessToken = responseData['accessToken'];
     final refreshToken = responseData['refreshToken'];
     final nickname = responseData['nickname'] ?? '익명';
@@ -311,9 +303,9 @@ class _LoginScreenState extends State<LoginScreen> {
     } else if (responseData['user'] is Map) {
       userId = responseData['user']['id'];
     }
-//===================================
+    //===================================
 
-print("userId = $userId");
+    print("userId = $userId");
     if (userId != null) {
       await storage.write(key: 'userId', value: userId.toString());
     }

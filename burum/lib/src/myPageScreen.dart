@@ -13,6 +13,7 @@ class MyPageScreen extends StatefulWidget {
 
 class _MyPageScreenState extends State<MyPageScreen> {
   String nickname = "불러오는 중...";
+  int completedErrandCount = 0; // 🌟 추가
   bool isLoading = true;
 
   final storage = const FlutterSecureStorage();
@@ -33,6 +34,8 @@ class _MyPageScreenState extends State<MyPageScreen> {
       setState(() {
         // 백엔드에서 어떻게 주느냐에 따라 맞춰서 꺼내 쓰세요!
         nickname = response.data['nickname'] ?? "닉네임 없음";
+        completedErrandCount =
+            response.data['completed_errand_count'] ?? 0; // 🌟 추가
         isLoading = false;
       });
     } on DioException catch (e) {
@@ -130,7 +133,16 @@ class _MyPageScreenState extends State<MyPageScreen> {
                   ),
                   ListTile(
                     title: const Text("완료한 심부름"),
-                    trailing: const Icon(Icons.arrow_forward_ios, size: 16),
+                    trailing: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          '$completedErrandCount회',
+                          style: const TextStyle(color: Colors.grey),
+                        ),
+                        const Icon(Icons.arrow_forward_ios, size: 16),
+                      ],
+                    ),
                     onTap: () {},
                   ),
                   const Divider(),

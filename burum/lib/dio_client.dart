@@ -59,6 +59,12 @@ class DioClient {
               return handler.reject(e); // UI단에는 에러를 그대로 전달
             }
           }
+          // 🌟 [추가] 401 TOKEN_EXPIRED 외의 모든 DioException에 대해 상세 로그 출력
+          print(
+            '🚨 Dio Error: ${e.requestOptions.method} ${e.requestOptions.path}',
+          );
+          print('🚨 Status Code: ${e.response?.statusCode}');
+          print('🚨 Response Data: ${e.response?.data}');
           // 그 외 모든 에러는 그대로 전달
           return handler.next(e);
         },
